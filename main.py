@@ -70,6 +70,20 @@ def nk225_vol(days: int = 20):
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/api/bull_put_strikes")
+def bull_put_strikes(S: float, sigma: float, T: float):
+
+    import math
+
+    one_sigma = S * (1 - sigma * math.sqrt(T))
+    two_sigma = S * (1 - 2 * sigma * math.sqrt(T))
+    ten_percent = S * 0.90
+
+    return {
+        "safe_1sigma": round(one_sigma, 2),
+        "super_safe_2sigma": round(two_sigma, 2),
+        "aggressive_10percent": round(ten_percent, 2)
+    }
 
 # -----------------------------
 # ④ ブル・プット・クレジットスプレッド API
@@ -238,6 +252,9 @@ def index():
     <button onclick="calcBullPut()">ブル・プット計算</button>
 
     <pre id="bullPutResult"></pre>
+
+    <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
+
 </div>
 
 <!-- ★ ベアコール UI ★ -->
@@ -362,6 +379,22 @@ async function calc(){
         "セータ: " + data.theta.toFixed(2) + "\\n" +
         "ベガ: " + data.vega.toFixed(2);
 }
+
+async function loadBullPutStrikes(){
+    const S = document.getElementById("S").value;
+    const sigma = document.getElementById("sigma").value;
+    const T = document.getElementById("T").value;
+
+    const url = `/api/bull_put_strikes?S=${S}&sigma=${sigma}&T=${T}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bullPutResult").textContent =
+        "📌 ストライク候補（ブルプット）\\n" +
+        "安全（1σ）: " + data.safe_1sigma + "\\n" +
+        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
+        "やや攻め（10%下）: " + data.aggressive_10percent;
+}
+
 </script>
 
 </body>
