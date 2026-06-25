@@ -91,34 +91,54 @@ def index():
 
     <!-- ★ スマホ最適化 CSS ★ -->
     <style>
-        @media (max-width: 480px) {
-            body {
-                font-size: 22px;
-                padding: 16px;
-            }
-            select, input {
-                width: 100%;
-                font-size: 22px;
-                padding: 12px;
-                margin: 8px 0;
-                border-radius: 10px;
-            }
-            button {
-                width: 100%;
-                font-size: 22px;
-                padding: 14px;
-                border-radius: 12px;
-                margin-top: 12px;
-            }
-            #infoBox {
-                font-size: 22px;
-                padding: 14px;
-            }
-            h2, h3 {
-                font-size: 26px;
-            }
+    /* スマホ最適化（幅600px以下） */
+    @media (max-width: 600px) {
+
+        body {
+            font-size: 26px;
+            padding: 20px;
+            line-height: 1.6;
         }
+
+        h2, h3 {
+            font-size: 30px;
+            margin-bottom: 20px;
+        }
+
+        select, input {
+            width: 100%;
+            font-size: 26px;
+            padding: 18px;
+            margin: 12px 0;
+            border-radius: 12px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            font-size: 28px;
+            padding: 20px;
+            border-radius: 14px;
+            margin-top: 20px;
+            background-color: #0078ff;
+            color: white;
+            border: none;
+        }
+
+        #infoBox {
+            font-size: 26px;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        pre {
+            font-size: 26px;
+            padding: 20px;
+            border-radius: 12px;
+        }
+    }
     </style>
+
 </head>
 
 <body style="font-family: sans-serif; padding: 20px;">
