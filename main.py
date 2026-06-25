@@ -100,7 +100,35 @@ def bull_put(S: float, K_short: float, K_long: float,
 
 
 # -----------------------------
-# ⑤ UI（スマホ最適化版 + ブルプット UI）
+# ⑤ ベア・コール・クレジットスプレッド API
+# -----------------------------
+@app.get("/api/bear_call")
+def bear_call(S: float, K_short: float, K_long: float,
+              premium_short: float, premium_long: float):
+
+    credit = premium_short - premium_long
+    max_profit = credit
+    max_loss = (K_long - K_short) - credit
+    breakeven = K_short + credit
+
+    if S <= K_short:
+        profit = max_profit
+    elif S >= K_long:
+        profit = -max_loss
+    else:
+        profit = credit - (S - K_short)
+
+    return {
+        "credit": credit,
+        "max_profit": max_profit,
+        "max_loss": max_loss,
+        "breakeven": breakeven,
+        "profit_at_S": profit
+    }
+
+
+# -----------------------------
+# ⑥ UI（スマホ最適化 + ブルプット + ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -156,7 +184,7 @@ def index():
     border:none;
   }
 
-  #infoBox, #bullPutBox{
+  #infoBox, #bullPutBox, #bearCallBox{
     background:var(--panel);
     padding:16px;
     border-radius:10px;
@@ -212,6 +240,27 @@ def index():
     <pre id="bullPutResult"></pre>
 </div>
 
+<!-- ★ ベアコール UI ★ -->
+<div id="bearCallBox" style="display:none;">
+    <h3>ベア・コール・クレジットスプレッド</h3>
+
+    売りコールのストライク（K_short）:<br>
+    <input id="bc_K_short" type="number">
+
+    買いコールのストライク（K_long）:<br>
+    <input id="bc_K_long" type="number">
+
+    売りコールのプレミアム:<br>
+    <input id="bc_premium_short" type="number">
+
+    買いコールのプレミアム:<br>
+    <input id="bc_premium_long" type="number">
+
+    <button onclick="calcBearCall()">ベア・コール計算</button>
+
+    <pre id="bearCallResult"></pre>
+</div>
+
 <hr>
 
 <h3>ブラック–ショールズ計算</h3>
@@ -232,9 +281,13 @@ async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
     document.getElementById("bullPutBox").style.display = "none";
+    document.getElementById("bearCallBox").style.display = "none";
 
     if(menu === "bull_put"){
         document.getElementById("bullPutBox").style.display = "block";
+    }
+    if(menu === "bear_call"){
+        document.getElementById("bearCallBox").style.display = "block";
     }
 
     if(menu === ""){
@@ -262,6 +315,24 @@ async function calcBullPut(){
     const data = await fetch(url).then(r=>r.json());
 
     document.getElementById("bullPutResult").textContent =
+        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
+        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
+        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
+        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
+        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
+}
+
+async function calcBearCall(){
+    const S = document.getElementById("S").value;
+    const K_short = document.getElementById("bc_K_short").value;
+    const K_long = document.getElementById("bc_K_long").value;
+    const premium_short = document.getElementById("bc_premium_short").value;
+    const premium_long = document.getElementById("bc_premium_long").value;
+
+    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bearCallResult").textContent =
         "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
         "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
         "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
