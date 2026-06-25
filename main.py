@@ -34,7 +34,7 @@ def bs_call(S: float, K: float, T: float, r: float, sigma: float):
 
 
 # -----------------------------
-# ② 日経225の現在値（info 方式）
+# ② 日経225の現在値
 # -----------------------------
 @app.get("/api/nk225_params")
 def nk225_params():
@@ -42,19 +42,16 @@ def nk225_params():
         yf_ticker = yf.Ticker("^N225")
         info = yf_ticker.info
 
-        price = info.get("regularMarketPrice")
-        previous_close = info.get("regularMarketPreviousClose")
-
         return {
-            "price": price,
-            "previous_close": previous_close
+            "price": info.get("regularMarketPrice"),
+            "previous_close": info.get("regularMarketPreviousClose")
         }
     except Exception as e:
         return {"error": str(e)}
 
 
 # -----------------------------
-# ③ 日経225のボラティリティ（過去20日）
+# ③ 日経225のボラティリティ
 # -----------------------------
 @app.get("/api/nk225_vol")
 def nk225_vol(days: int = 20):
@@ -69,83 +66,90 @@ def nk225_vol(days: int = 20):
         log_returns = np.log(close[1:] / close[:-1])
         vol = np.std(log_returns) * np.sqrt(252)
 
-        return {
-            "days": days,
-            "volatility": vol
-        }
+        return {"days": days, "volatility": vol}
     except Exception as e:
         return {"error": str(e)}
 
 
 # -----------------------------
-# ④ UI（HTML + JS）
+# ④ UI（スマホ最適化版）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
     return """
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <meta charset="utf-8">
-    <title>日経225 オプション分析ツール</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>日経225 オプション分析ツール</title>
 
-    <!-- ★ スマホ最適化 CSS ★ -->
-    <style>
-    /* スマホ最適化（幅600px以下） */
-    @media (max-width: 600px) {
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#f2f2f2;
+    --accent:#0078ff;
+    --text:#000;
+    --touch:56px;
+  }
 
-        body {
-            font-size: 26px;
-            padding: 20px;
-            line-height: 1.6;
-        }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui, -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+    padding:16px;
+    font-size:22px;
+  }
 
-        h2, h3 {
-            font-size: 30px;
-            margin-bottom: 20px;
-        }
+  h2, h3{
+    font-size:28px;
+    margin-bottom:12px;
+  }
 
-        select, input {
-            width: 100%;
-            font-size: 26px;
-            padding: 18px;
-            margin: 12px 0;
-            border-radius: 12px;
-            border: 1px solid #ccc;
-        }
+  select, input{
+    width:100%;
+    font-size:24px;
+    padding:16px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ccc;
+    background:#fff;
+  }
 
-        button {
-            width: 100%;
-            font-size: 28px;
-            padding: 20px;
-            border-radius: 14px;
-            margin-top: 20px;
-            background-color: #0078ff;
-            color: white;
-            border: none;
-        }
+  button{
+    width:100%;
+    font-size:26px;
+    padding:18px;
+    border-radius:12px;
+    margin-top:16px;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+  }
 
-        #infoBox {
-            font-size: 26px;
-            padding: 20px;
-            border-radius: 12px;
-        }
+  #infoBox{
+    background:var(--panel);
+    padding:16px;
+    border-radius:10px;
+    font-size:24px;
+    margin-top:16px;
+  }
 
-        pre {
-            font-size: 26px;
-            padding: 20px;
-            border-radius: 12px;
-        }
-    }
-    </style>
-
+  pre{
+    background:var(--panel);
+    padding:16px;
+    border-radius:10px;
+    font-size:24px;
+    white-space:pre-wrap;
+  }
+</style>
 </head>
 
-<body style="font-family: sans-serif; padding: 20px;">
+<body>
 
 <h2>日経225 オプション分析ツール</h2>
 
-<!-- メニュー -->
 <h3>メニュー</h3>
 <select id="menu" onchange="onMenuChange()">
     <option value="">選択してください</option>
@@ -153,51 +157,45 @@ def index():
     <option value="long_call">ロングコール</option>
     <option value="long_put">ロングプット</option>
     <option value="straddle">ストラドル</option>
-
-    <!-- ★ クレジットスプレッド追加 ★ -->
     <option value="bull_put">ブル・プット・クレジットスプレッド</option>
     <option value="bear_call">ベア・コール・クレジットスプレッド</option>
 </select>
 
-<!-- 情報表示エリア -->
-<div id="infoBox" style="margin-top:20px; background:#f0f0f0; padding:10px;"></div>
+<div id="infoBox"></div>
 
 <hr>
 
-<!-- ブラック–ショールズ計算 -->
 <h3>ブラック–ショールズ計算</h3>
 
-株価 S（日経225）：<input id="S" value="40000"><br><br>
-権利行使価格 K：<input id="K" value="41000"><br><br>
-残存日数 T（年換算）：<input id="T" value="0.1"><br><br>
-金利 r：<input id="r" value="0.001"><br><br>
-ボラティリティ σ：<input id="sigma" value="0.2"><br><br>
+株価 S（日経225）：<input id="S" value="40000">
+権利行使価格 K：<input id="K" value="41000">
+残存日数 T（年換算）：<input id="T" value="0.1">
+金利 r：<input id="r" value="0.001">
+ボラティリティ σ：<input id="sigma" value="0.2">
 
 <button onclick="calc()">計算する</button>
 
 <h3>計算結果</h3>
-<pre id="result" style="background:#f5f5f5; padding:10px;"></pre>
+<pre id="result"></pre>
 
 <script>
-async function onMenuChange() {
+async function onMenuChange(){
     const menu = document.getElementById("menu").value;
-
-    if (menu === "") {
+    if(menu === ""){
         document.getElementById("infoBox").innerHTML = "";
         return;
     }
 
-    // 株価とボラティリティを取得
-    const S = await fetch("/api/nk225_params").then(r => r.json());
-    const V = await fetch("/api/nk225_vol?days=20").then(r => r.json());
+    const S = await fetch("/api/nk225_params").then(r=>r.json());
+    const V = await fetch("/api/nk225_vol?days=20").then(r=>r.json());
 
     document.getElementById("infoBox").innerHTML =
-        "📌 株価 S（日経225）: " + S.price + "<br>" +
-        "📌 ボラティリティ σ（20日HV）: " + V.volatility.toFixed(4) + "<br>" +
-        "📌 選択中のメニュー: " + menu;
+        "📌 株価 S: " + S.price + "<br>" +
+        "📌 ボラティリティ σ: " + V.volatility.toFixed(4) + "<br>" +
+        "📌 メニュー: " + menu;
 }
 
-async function calc() {
+async function calc(){
     const S = document.getElementById("S").value;
     const K = document.getElementById("K").value;
     const T = document.getElementById("T").value;
@@ -205,10 +203,9 @@ async function calc() {
     const sigma = document.getElementById("sigma").value;
 
     const url = `/api/bs_call?S=${S}&K=${K}&T=${T}&r=${r}&sigma=${sigma}`;
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await fetch(url).then(r=>r.json());
 
-    if (data.error) {
+    if(data.error){
         document.getElementById("result").textContent = "エラー: " + data.error;
         return;
     }
