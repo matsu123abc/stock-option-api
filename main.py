@@ -100,13 +100,40 @@ def bull_put(S: float, K_short: float, K_long: float,
 
 
 # -----------------------------
-# ⑤ ブルプットのストライク候補 API（現在値 S と σ を使用）
+# ⑤ ベア・コール・クレジットスプレッド API
+# -----------------------------
+@app.get("/api/bear_call")
+def bear_call(S: float, K_short: float, K_long: float,
+              premium_short: float, premium_long: float):
+
+    credit = premium_short - premium_long
+    max_profit = credit
+    max_loss = (K_long - K_short) - credit
+    breakeven = K_short + credit
+
+    if S <= K_short:
+        profit = max_profit
+    elif S >= K_long:
+        profit = -max_loss
+    else:
+        profit = credit - (S - K_short)
+
+    return {
+        "credit": credit,
+        "max_profit": max_profit,
+        "max_loss": max_loss,
+        "breakeven": breakeven,
+        "profit_at_S": profit
+    }
+
+
+# -----------------------------
+# ⑥ ブルプットのストライク候補 API（現在値 S と σ）
 # -----------------------------
 @app.get("/api/bull_put_strikes")
 def bull_put_strikes(T: float = 0.1):
     import math
 
-    # 現在値とボラティリティを取得
     yf_ticker = yf.Ticker("^N225")
     info = yf_ticker.info
     S = info.get("regularMarketPrice")
@@ -116,7 +143,6 @@ def bull_put_strikes(T: float = 0.1):
     log_returns = np.log(close[1:] / close[:-1])
     sigma = np.std(log_returns) * np.sqrt(252)
 
-    # ストライク候補
     one_sigma = S * (1 - sigma * math.sqrt(T))
     two_sigma = S * (1 - 2 * sigma * math.sqrt(T))
     ten_percent = S * 0.90
@@ -131,7 +157,36 @@ def bull_put_strikes(T: float = 0.1):
 
 
 # -----------------------------
-# ⑥ UI（スマホ最適化 + ブルプット + ストライク候補）
+# ⑦ ベアコールのストライク候補 API（現在値 S と σ）
+# -----------------------------
+@app.get("/api/bear_call_strikes")
+def bear_call_strikes(T: float = 0.1):
+    import math
+
+    yf_ticker = yf.Ticker("^N225")
+    info = yf_ticker.info
+    S = info.get("regularMarketPrice")
+
+    hist = yf_ticker.history(period="21d")
+    close = hist["Close"].values
+    log_returns = np.log(close[1:] / close[:-1])
+    sigma = np.std(log_returns) * np.sqrt(252)
+
+    one_sigma = S * (1 + sigma * math.sqrt(T))
+    two_sigma = S * (1 + 2 * sigma * math.sqrt(T))
+    ten_percent = S * 1.10
+
+    return {
+        "S": round(S, 2),
+        "sigma": round(sigma, 4),
+        "safe_1sigma": round(one_sigma, 2),
+        "super_safe_2sigma": round(two_sigma, 2),
+        "aggressive_10percent": round(ten_percent, 2)
+    }
+
+
+# -----------------------------
+# ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -186,7 +241,7 @@ def index():
     border:none;
   }
 
-  #infoBox, #bullPutBox{
+  #infoBox, #bullPutBox, #bearCallBox{
     background:var(--panel);
     padding:16px;
     border-radius:10px;
@@ -213,6 +268,7 @@ def index():
     <option value="">選択してください</option>
     <option value="basic">基本情報（株価・ボラティリティ）</option>
     <option value="bull_put">ブル・プット・クレジットスプレッド</option>
+    <option value="bear_call">ベア・コール・クレジットスプレッド</option>
 </select>
 
 <div id="infoBox"></div>
@@ -220,6 +276,9 @@ def index():
 <!-- ★ ブルプット UI ★ -->
 <div id="bullPutBox" style="display:none;">
     <h3>ブル・プット・クレジットスプレッド</h3>
+
+    株価 S（日経225・任意入力可）:<br>
+    <input id="bp_S" type="number">
 
     売りプットのストライク（K_short）:<br>
     <input id="bp_K_short" type="number">
@@ -233,12 +292,39 @@ def index():
     買いプットのプレミアム:<br>
     <input id="bp_premium_long" type="number">
 
-    <button onclick="calcBullPut()">ブル・プット計算</button>
+    <button onclick="calcBullPut()">ブル・プット損益計算</button>
 
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
     <pre id="bullPutStrikes"></pre>
 
     <pre id="bullPutResult"></pre>
+</div>
+
+<!-- ★ ベアコール UI ★ -->
+<div id="bearCallBox" style="display:none;">
+    <h3>ベア・コール・クレジットスプレッド</h3>
+
+    株価 S（日経225・任意入力可）:<br>
+    <input id="bc_S" type="number">
+
+    売りコールのストライク（K_short）:<br>
+    <input id="bc_K_short" type="number">
+
+    買いコールのストライク（K_long）:<br>
+    <input id="bc_K_long" type="number">
+
+    売りコールのプレミアム:<br>
+    <input id="bc_premium_short" type="number">
+
+    買いコールのプレミアム:<br>
+    <input id="bc_premium_long" type="number">
+
+    <button onclick="calcBearCall()">ベア・コール損益計算</button>
+
+    <button onclick="loadBearCallStrikes()">ストライク候補を表示</button>
+    <pre id="bearCallStrikes"></pre>
+
+    <pre id="bearCallResult"></pre>
 </div>
 
 <hr>
@@ -248,9 +334,13 @@ async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
     document.getElementById("bullPutBox").style.display = "none";
+    document.getElementById("bearCallBox").style.display = "none";
 
     if(menu === "bull_put"){
         document.getElementById("bullPutBox").style.display = "block";
+    }
+    if(menu === "bear_call"){
+        document.getElementById("bearCallBox").style.display = "block";
     }
 
     if(menu === ""){
@@ -280,17 +370,48 @@ async function loadBullPutStrikes(){
         "やや攻め（10%下）: " + data.aggressive_10percent;
 }
 
+async function loadBearCallStrikes(){
+    const T = 0.1;
+    const data = await fetch(`/api/bear_call_strikes?T=${T}`).then(r=>r.json());
+
+    document.getElementById("bearCallStrikes").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 ボラティリティ σ: " + data.sigma + "\\n\\n" +
+        "📌 ストライク候補（ベアコール）\\n" +
+        "安全（1σ）: " + data.safe_1sigma + "\\n" +
+        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
+        "やや攻め（10%上）: " + data.aggressive_10percent;
+}
+
 async function calcBullPut(){
-    const S = document.getElementById("S")?.value || 0;
-    const K_short = document.getElementById("bp_K_short").value;
-    const K_long = document.getElementById("bp_K_long").value;
-    const premium_short = document.getElementById("bp_premium_short").value;
-    const premium_long = document.getElementById("bp_premium_long").value;
+    const S = Number(document.getElementById("bp_S").value || 0);
+    const K_short = Number(document.getElementById("bp_K_short").value);
+    const K_long = Number(document.getElementById("bp_K_long").value);
+    const premium_short = Number(document.getElementById("bp_premium_short").value);
+    const premium_long = Number(document.getElementById("bp_premium_long").value);
 
     const url = `/api/bull_put?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
     const data = await fetch(url).then(r=>r.json());
 
     document.getElementById("bullPutResult").textContent =
+        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
+        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
+        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
+        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
+        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
+}
+
+async function calcBearCall(){
+    const S = Number(document.getElementById("bc_S").value || 0);
+    const K_short = Number(document.getElementById("bc_K_short").value);
+    const K_long = Number(document.getElementById("bc_K_long").value);
+    const premium_short = Number(document.getElementById("bc_premium_short").value);
+    const premium_long = Number(document.getElementById("bc_premium_long").value);
+
+    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bearCallResult").textContent =
         "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
         "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
         "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
