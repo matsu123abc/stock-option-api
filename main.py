@@ -88,7 +88,39 @@ def index():
 <head>
     <meta charset="utf-8">
     <title>日経225 オプション分析ツール</title>
+
+    <!-- ★ スマホ最適化 CSS ★ -->
+    <style>
+        @media (max-width: 480px) {
+            body {
+                font-size: 22px;
+                padding: 16px;
+            }
+            select, input {
+                width: 100%;
+                font-size: 22px;
+                padding: 12px;
+                margin: 8px 0;
+                border-radius: 10px;
+            }
+            button {
+                width: 100%;
+                font-size: 22px;
+                padding: 14px;
+                border-radius: 12px;
+                margin-top: 12px;
+            }
+            #infoBox {
+                font-size: 22px;
+                padding: 14px;
+            }
+            h2, h3 {
+                font-size: 26px;
+            }
+        }
+    </style>
 </head>
+
 <body style="font-family: sans-serif; padding: 20px;">
 
 <h2>日経225 オプション分析ツール</h2>
@@ -101,6 +133,10 @@ def index():
     <option value="long_call">ロングコール</option>
     <option value="long_put">ロングプット</option>
     <option value="straddle">ストラドル</option>
+
+    <!-- ★ クレジットスプレッド追加 ★ -->
+    <option value="bull_put">ブル・プット・クレジットスプレッド</option>
+    <option value="bear_call">ベア・コール・クレジットスプレッド</option>
 </select>
 
 <!-- 情報表示エリア -->
