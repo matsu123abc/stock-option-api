@@ -72,7 +72,35 @@ def nk225_vol(days: int = 20):
 
 
 # -----------------------------
-# ④ UI（スマホ最適化版）
+# ④ ブル・プット・クレジットスプレッド API
+# -----------------------------
+@app.get("/api/bull_put")
+def bull_put(S: float, K_short: float, K_long: float,
+             premium_short: float, premium_long: float):
+
+    credit = premium_short - premium_long
+    max_profit = credit
+    max_loss = (K_short - K_long) - credit
+    breakeven = K_short - credit
+
+    if S >= K_short:
+        profit = max_profit
+    elif S <= K_long:
+        profit = -max_loss
+    else:
+        profit = credit - (K_short - S)
+
+    return {
+        "credit": credit,
+        "max_profit": max_profit,
+        "max_loss": max_loss,
+        "breakeven": breakeven,
+        "profit_at_S": profit
+    }
+
+
+# -----------------------------
+# ⑤ UI（スマホ最適化版 + ブルプット UI）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -128,7 +156,7 @@ def index():
     border:none;
   }
 
-  #infoBox{
+  #infoBox, #bullPutBox{
     background:var(--panel);
     padding:16px;
     border-radius:10px;
@@ -163,6 +191,27 @@ def index():
 
 <div id="infoBox"></div>
 
+<!-- ★ ブルプット UI ★ -->
+<div id="bullPutBox" style="display:none;">
+    <h3>ブル・プット・クレジットスプレッド</h3>
+
+    売りプットのストライク（K_short）:<br>
+    <input id="bp_K_short" type="number">
+
+    買いプットのストライク（K_long）:<br>
+    <input id="bp_K_long" type="number">
+
+    売りプットのプレミアム:<br>
+    <input id="bp_premium_short" type="number">
+
+    買いプットのプレミアム:<br>
+    <input id="bp_premium_long" type="number">
+
+    <button onclick="calcBullPut()">ブル・プット計算</button>
+
+    <pre id="bullPutResult"></pre>
+</div>
+
 <hr>
 
 <h3>ブラック–ショールズ計算</h3>
@@ -181,6 +230,13 @@ def index():
 <script>
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
+
+    document.getElementById("bullPutBox").style.display = "none";
+
+    if(menu === "bull_put"){
+        document.getElementById("bullPutBox").style.display = "block";
+    }
+
     if(menu === ""){
         document.getElementById("infoBox").innerHTML = "";
         return;
@@ -193,6 +249,24 @@ async function onMenuChange(){
         "📌 株価 S: " + S.price + "<br>" +
         "📌 ボラティリティ σ: " + V.volatility.toFixed(4) + "<br>" +
         "📌 メニュー: " + menu;
+}
+
+async function calcBullPut(){
+    const S = document.getElementById("S").value;
+    const K_short = document.getElementById("bp_K_short").value;
+    const K_long = document.getElementById("bp_K_long").value;
+    const premium_short = document.getElementById("bp_premium_short").value;
+    const premium_long = document.getElementById("bp_premium_long").value;
+
+    const url = `/api/bull_put?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bullPutResult").textContent =
+        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
+        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
+        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
+        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
+        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
 
 async function calc(){
