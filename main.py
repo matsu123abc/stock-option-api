@@ -34,13 +34,13 @@ def bs_call(S: float, K: float, T: float, r: float, sigma: float):
 
 
 # -----------------------------
-# ② 日経225の現在値（既存コードと同じ info 方式）
+# ② 日経225の現在値（info 方式）
 # -----------------------------
 @app.get("/api/nk225_params")
 def nk225_params():
     try:
         yf_ticker = yf.Ticker("^N225")
-        info = yf_ticker.info   # ← 章さんの既存コードと同じ
+        info = yf_ticker.info
 
         price = info.get("regularMarketPrice")
         previous_close = info.get("regularMarketPreviousClose")
@@ -87,11 +87,29 @@ def index():
 <html>
 <head>
     <meta charset="utf-8">
-    <title>日経225 オプション価格計算ツール</title>
+    <title>日経225 オプション分析ツール</title>
 </head>
 <body style="font-family: sans-serif; padding: 20px;">
 
-<h2>日経225 オプション価格計算（ブラック–ショールズ）</h2>
+<h2>日経225 オプション分析ツール</h2>
+
+<!-- メニュー -->
+<h3>メニュー</h3>
+<select id="menu" onchange="onMenuChange()">
+    <option value="">選択してください</option>
+    <option value="basic">基本情報（株価・ボラティリティ）</option>
+    <option value="long_call">ロングコール</option>
+    <option value="long_put">ロングプット</option>
+    <option value="straddle">ストラドル</option>
+</select>
+
+<!-- 情報表示エリア -->
+<div id="infoBox" style="margin-top:20px; background:#f0f0f0; padding:10px;"></div>
+
+<hr>
+
+<!-- ブラック–ショールズ計算 -->
+<h3>ブラック–ショールズ計算</h3>
 
 株価 S（日経225）：<input id="S" value="40000"><br><br>
 権利行使価格 K：<input id="K" value="41000"><br><br>
@@ -105,20 +123,22 @@ def index():
 <pre id="result" style="background:#f5f5f5; padding:10px;"></pre>
 
 <script>
-async function loadNK225() {
-    const res = await fetch("/api/nk225_params");
-    const data = await res.json();
-    if (data.price) {
-        document.getElementById("S").value = data.price;
-    }
-}
+async function onMenuChange() {
+    const menu = document.getElementById("menu").value;
 
-async function loadVol() {
-    const res = await fetch("/api/nk225_vol?days=20");
-    const data = await res.json();
-    if (data.volatility) {
-        document.getElementById("sigma").value = data.volatility.toFixed(4);
+    if (menu === "") {
+        document.getElementById("infoBox").innerHTML = "";
+        return;
     }
+
+    // 株価とボラティリティを取得
+    const S = await fetch("/api/nk225_params").then(r => r.json());
+    const V = await fetch("/api/nk225_vol?days=20").then(r => r.json());
+
+    document.getElementById("infoBox").innerHTML =
+        "📌 株価 S（日経225）: " + S.price + "<br>" +
+        "📌 ボラティリティ σ（20日HV）: " + V.volatility.toFixed(4) + "<br>" +
+        "📌 選択中のメニュー: " + menu;
 }
 
 async function calc() {
@@ -144,11 +164,6 @@ async function calc() {
         "セータ: " + data.theta.toFixed(2) + "\\n" +
         "ベガ: " + data.vega.toFixed(2);
 }
-
-window.onload = () => {
-    loadNK225();
-    loadVol();
-};
 </script>
 
 </body>
