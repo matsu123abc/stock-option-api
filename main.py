@@ -256,6 +256,16 @@ def bear_call_premium_candidates(T: float = 0.1, r: float = 0.001):
         "premium_10percent": round(call_price(S, K3, T, r, sigma), 2)
     }
 
+@app.get("/api/bull_put_long_candidates")
+def bull_put_long_candidates(K_short: float):
+    return {
+        "short_strike": K_short,
+        "long_safe": K_short - 4000,     # 安全
+        "long_standard": K_short - 2000, # 標準
+        "long_aggressive": K_short - 1000 # 攻め
+    }
+
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
@@ -371,6 +381,9 @@ def index():
 
     <button onclick="loadBullPutPremiums()">プレミアム候補を表示</button>
     <pre id="bullPutPremiums"></pre>
+
+    <button onclick="loadBullPutLongCandidates()">買いプット候補を表示</button>
+    <pre id="bullPutLongCandidates"></pre>
 
     <pre id="bullPutResult"></pre>
 </div>
@@ -523,6 +536,21 @@ async function loadBearCallPremiums(){
         "2σ ストライク: " + data.strike_2sigma + " → プレミアム: " + data.premium_2sigma + "\\n" +
         "10%上: " + data.strike_10percent + " → プレミアム: " + data.premium_10percent;
 }
+
+async function loadBullPutLongCandidates(){
+    const K_short = Number(document.getElementById("bp_K_short").value);
+
+    const data = await fetch(`/api/bull_put_long_candidates?K_short=${K_short}`)
+        .then(r=>r.json());
+
+    document.getElementById("bullPutLongCandidates").textContent =
+        "📌 売りプット: " + data.short_strike + "\\n\\n" +
+        "📌 買いプット候補\\n" +
+        "安全（Wide）: " + data.long_safe + "\\n" +
+        "標準（Medium）: " + data.long_standard + "\\n" +
+        "攻め（Narrow）: " + data.long_aggressive;
+}
+
 
 </script>
 
