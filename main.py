@@ -70,20 +70,6 @@ def nk225_vol(days: int = 20):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/api/bull_put_strikes")
-def bull_put_strikes(S: float, sigma: float, T: float):
-
-    import math
-
-    one_sigma = S * (1 - sigma * math.sqrt(T))
-    two_sigma = S * (1 - 2 * sigma * math.sqrt(T))
-    ten_percent = S * 0.90
-
-    return {
-        "safe_1sigma": round(one_sigma, 2),
-        "super_safe_2sigma": round(two_sigma, 2),
-        "aggressive_10percent": round(ten_percent, 2)
-    }
 
 # -----------------------------
 # ④ ブル・プット・クレジットスプレッド API
@@ -114,35 +100,38 @@ def bull_put(S: float, K_short: float, K_long: float,
 
 
 # -----------------------------
-# ⑤ ベア・コール・クレジットスプレッド API
+# ⑤ ブルプットのストライク候補 API（現在値 S と σ を使用）
 # -----------------------------
-@app.get("/api/bear_call")
-def bear_call(S: float, K_short: float, K_long: float,
-              premium_short: float, premium_long: float):
+@app.get("/api/bull_put_strikes")
+def bull_put_strikes(T: float = 0.1):
+    import math
 
-    credit = premium_short - premium_long
-    max_profit = credit
-    max_loss = (K_long - K_short) - credit
-    breakeven = K_short + credit
+    # 現在値とボラティリティを取得
+    yf_ticker = yf.Ticker("^N225")
+    info = yf_ticker.info
+    S = info.get("regularMarketPrice")
 
-    if S <= K_short:
-        profit = max_profit
-    elif S >= K_long:
-        profit = -max_loss
-    else:
-        profit = credit - (S - K_short)
+    hist = yf_ticker.history(period="21d")
+    close = hist["Close"].values
+    log_returns = np.log(close[1:] / close[:-1])
+    sigma = np.std(log_returns) * np.sqrt(252)
+
+    # ストライク候補
+    one_sigma = S * (1 - sigma * math.sqrt(T))
+    two_sigma = S * (1 - 2 * sigma * math.sqrt(T))
+    ten_percent = S * 0.90
 
     return {
-        "credit": credit,
-        "max_profit": max_profit,
-        "max_loss": max_loss,
-        "breakeven": breakeven,
-        "profit_at_S": profit
+        "S": round(S, 2),
+        "sigma": round(sigma, 4),
+        "safe_1sigma": round(one_sigma, 2),
+        "super_safe_2sigma": round(two_sigma, 2),
+        "aggressive_10percent": round(ten_percent, 2)
     }
 
 
 # -----------------------------
-# ⑥ UI（スマホ最適化 + ブルプット + ベアコール）
+# ⑥ UI（スマホ最適化 + ブルプット + ストライク候補）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -160,7 +149,6 @@ def index():
     --panel:#f2f2f2;
     --accent:#0078ff;
     --text:#000;
-    --touch:56px;
   }
 
   body{
@@ -198,7 +186,7 @@ def index():
     border:none;
   }
 
-  #infoBox, #bullPutBox, #bearCallBox{
+  #infoBox, #bullPutBox{
     background:var(--panel);
     padding:16px;
     border-radius:10px;
@@ -224,11 +212,7 @@ def index():
 <select id="menu" onchange="onMenuChange()">
     <option value="">選択してください</option>
     <option value="basic">基本情報（株価・ボラティリティ）</option>
-    <option value="long_call">ロングコール</option>
-    <option value="long_put">ロングプット</option>
-    <option value="straddle">ストラドル</option>
     <option value="bull_put">ブル・プット・クレジットスプレッド</option>
-    <option value="bear_call">ベア・コール・クレジットスプレッド</option>
 </select>
 
 <div id="infoBox"></div>
@@ -251,60 +235,22 @@ def index():
 
     <button onclick="calcBullPut()">ブル・プット計算</button>
 
-    <pre id="bullPutResult"></pre>
-
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
+    <pre id="bullPutStrikes"></pre>
 
-</div>
-
-<!-- ★ ベアコール UI ★ -->
-<div id="bearCallBox" style="display:none;">
-    <h3>ベア・コール・クレジットスプレッド</h3>
-
-    売りコールのストライク（K_short）:<br>
-    <input id="bc_K_short" type="number">
-
-    買いコールのストライク（K_long）:<br>
-    <input id="bc_K_long" type="number">
-
-    売りコールのプレミアム:<br>
-    <input id="bc_premium_short" type="number">
-
-    買いコールのプレミアム:<br>
-    <input id="bc_premium_long" type="number">
-
-    <button onclick="calcBearCall()">ベア・コール計算</button>
-
-    <pre id="bearCallResult"></pre>
+    <pre id="bullPutResult"></pre>
 </div>
 
 <hr>
-
-<h3>ブラック–ショールズ計算</h3>
-
-株価 S（日経225）：<input id="S" value="40000">
-権利行使価格 K：<input id="K" value="41000">
-残存日数 T（年換算）：<input id="T" value="0.1">
-金利 r：<input id="r" value="0.001">
-ボラティリティ σ：<input id="sigma" value="0.2">
-
-<button onclick="calc()">計算する</button>
-
-<h3>計算結果</h3>
-<pre id="result"></pre>
 
 <script>
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
     document.getElementById("bullPutBox").style.display = "none";
-    document.getElementById("bearCallBox").style.display = "none";
 
     if(menu === "bull_put"){
         document.getElementById("bullPutBox").style.display = "block";
-    }
-    if(menu === "bear_call"){
-        document.getElementById("bearCallBox").style.display = "block";
     }
 
     if(menu === ""){
@@ -321,8 +267,21 @@ async function onMenuChange(){
         "📌 メニュー: " + menu;
 }
 
+async function loadBullPutStrikes(){
+    const T = 0.1;
+    const data = await fetch(`/api/bull_put_strikes?T=${T}`).then(r=>r.json());
+
+    document.getElementById("bullPutStrikes").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 ボラティリティ σ: " + data.sigma + "\\n\\n" +
+        "📌 ストライク候補（ブルプット）\\n" +
+        "安全（1σ）: " + data.safe_1sigma + "\\n" +
+        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
+        "やや攻め（10%下）: " + data.aggressive_10percent;
+}
+
 async function calcBullPut(){
-    const S = document.getElementById("S").value;
+    const S = document.getElementById("S")?.value || 0;
     const K_short = document.getElementById("bp_K_short").value;
     const K_long = document.getElementById("bp_K_long").value;
     const premium_short = document.getElementById("bp_premium_short").value;
@@ -338,63 +297,6 @@ async function calcBullPut(){
         "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
         "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
-
-async function calcBearCall(){
-    const S = document.getElementById("S").value;
-    const K_short = document.getElementById("bc_K_short").value;
-    const K_long = document.getElementById("bc_K_long").value;
-    const premium_short = document.getElementById("bc_premium_short").value;
-    const premium_long = document.getElementById("bc_premium_long").value;
-
-    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
-    const data = await fetch(url).then(r=>r.json());
-
-    document.getElementById("bearCallResult").textContent =
-        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
-        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
-        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
-        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
-        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
-}
-
-async function calc(){
-    const S = document.getElementById("S").value;
-    const K = document.getElementById("K").value;
-    const T = document.getElementById("T").value;
-    const r = document.getElementById("r").value;
-    const sigma = document.getElementById("sigma").value;
-
-    const url = `/api/bs_call?S=${S}&K=${K}&T=${T}&r=${r}&sigma=${sigma}`;
-    const data = await fetch(url).then(r=>r.json());
-
-    if(data.error){
-        document.getElementById("result").textContent = "エラー: " + data.error;
-        return;
-    }
-
-    document.getElementById("result").textContent =
-        "理論価格: " + data.price.toFixed(2) + "\\n" +
-        "デルタ: " + data.delta.toFixed(4) + "\\n" +
-        "ガンマ: " + data.gamma.toFixed(6) + "\\n" +
-        "セータ: " + data.theta.toFixed(2) + "\\n" +
-        "ベガ: " + data.vega.toFixed(2);
-}
-
-async function loadBullPutStrikes(){
-    const S = document.getElementById("S").value;
-    const sigma = document.getElementById("sigma").value;
-    const T = document.getElementById("T").value;
-
-    const url = `/api/bull_put_strikes?S=${S}&sigma=${sigma}&T=${T}`;
-    const data = await fetch(url).then(r=>r.json());
-
-    document.getElementById("bullPutResult").textContent =
-        "📌 ストライク候補（ブルプット）\\n" +
-        "安全（1σ）: " + data.safe_1sigma + "\\n" +
-        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
-        "やや攻め（10%下）: " + data.aggressive_10percent;
-}
-
 </script>
 
 </body>
