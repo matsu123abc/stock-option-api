@@ -184,6 +184,78 @@ def bear_call_strikes(T: float = 0.1):
         "aggressive_10percent": round(ten_percent, 2)
     }
 
+@app.get("/api/bull_put_premium_candidates")
+def bull_put_premium_candidates(T: float = 0.1, r: float = 0.001):
+    import math
+
+    # 現在値とボラティリティ
+    yf_ticker = yf.Ticker("^N225")
+    info = yf_ticker.info
+    S = info.get("regularMarketPrice")
+
+    hist = yf_ticker.history(period="21d")
+    close = hist["Close"].values
+    log_returns = np.log(close[1:] / close[:-1])
+    sigma = np.std(log_returns) * np.sqrt(252)
+
+    # ストライク候補
+    K1 = S * (1 - sigma * math.sqrt(T))      # 1σ
+    K2 = S * (1 - 2 * sigma * math.sqrt(T))  # 2σ
+    K3 = S * 0.90                             # 10%下
+
+    # プット価格（BSモデル）
+    def put_price(S, K, T, r, sigma):
+        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+        d2 = d1 - sigma*math.sqrt(T)
+        return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
+
+    return {
+        "S": round(S, 2),
+        "sigma": round(sigma, 4),
+        "strike_1sigma": round(K1, 2),
+        "premium_1sigma": round(put_price(S, K1, T, r, sigma), 2),
+        "strike_2sigma": round(K2, 2),
+        "premium_2sigma": round(put_price(S, K2, T, r, sigma), 2),
+        "strike_10percent": round(K3, 2),
+        "premium_10percent": round(put_price(S, K3, T, r, sigma), 2)
+    }
+
+@app.get("/api/bear_call_premium_candidates")
+def bear_call_premium_candidates(T: float = 0.1, r: float = 0.001):
+    import math
+
+    # 現在値とボラティリティ
+    yf_ticker = yf.Ticker("^N225")
+    info = yf_ticker.info
+    S = info.get("regularMarketPrice")
+
+    hist = yf_ticker.history(period="21d")
+    close = hist["Close"].values
+    log_returns = np.log(close[1:] / close[:-1])
+    sigma = np.std(log_returns) * np.sqrt(252)
+
+    # ストライク候補
+    K1 = S * (1 + sigma * math.sqrt(T))      # 1σ
+    K2 = S * (1 + 2 * sigma * math.sqrt(T))  # 2σ
+    K3 = S * 1.10                             # 10%上
+
+    # コール価格（BSモデル）
+    def call_price(S, K, T, r, sigma):
+        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+        d2 = d1 - sigma*math.sqrt(T)
+        return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)
+
+    return {
+        "S": round(S, 2),
+        "sigma": round(sigma, 4),
+        "strike_1sigma": round(K1, 2),
+        "premium_1sigma": round(call_price(S, K1, T, r, sigma), 2),
+        "strike_2sigma": round(K2, 2),
+        "premium_2sigma": round(call_price(S, K2, T, r, sigma), 2),
+        "strike_10percent": round(K3, 2),
+        "premium_10percent": round(call_price(S, K3, T, r, sigma), 2)
+    }
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
@@ -297,6 +369,9 @@ def index():
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
     <pre id="bullPutStrikes"></pre>
 
+    <button onclick="loadBullPutPremiums()">プレミアム候補を表示</button>
+    <pre id="bullPutPremiums"></pre>
+
     <pre id="bullPutResult"></pre>
 </div>
 
@@ -323,6 +398,9 @@ def index():
 
     <button onclick="loadBearCallStrikes()">ストライク候補を表示</button>
     <pre id="bearCallStrikes"></pre>
+
+    <button onclick="loadBearCallPremiums()">プレミアム候補を表示</button>
+    <pre id="bearCallPremiums"></pre>
 
     <pre id="bearCallResult"></pre>
 </div>
@@ -418,6 +496,34 @@ async function calcBearCall(){
         "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
         "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
+
+async function loadBullPutPremiums(){
+    const T = 0.1;
+    const data = await fetch(`/api/bull_put_premium_candidates?T=${T}`).then(r=>r.json());
+
+    document.getElementById("bullPutPremiums").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 σ: " + data.sigma + "\\n\\n" +
+        "📌 プレミアム候補（ブルプット）\\n" +
+        "1σ ストライク: " + data.strike_1sigma + " → プレミアム: " + data.premium_1sigma + "\\n" +
+        "2σ ストライク: " + data.strike_2sigma + " → プレミアム: " + data.premium_2sigma + "\\n" +
+        "10%下: " + data.strike_10percent + " → プレミアム: " + data.premium_10percent;
+}
+
+
+async function loadBearCallPremiums(){
+    const T = 0.1;   // 残存日数（年換算）
+    const data = await fetch(`/api/bear_call_premium_candidates?T=${T}`).then(r=>r.json());
+
+    document.getElementById("bearCallPremiums").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 σ: " + data.sigma + "\\n\\n" +
+        "📌 プレミアム候補（ベアコール）\\n" +
+        "1σ ストライク: " + data.strike_1sigma + " → プレミアム: " + data.premium_1sigma + "\\n" +
+        "2σ ストライク: " + data.strike_2sigma + " → プレミアム: " + data.premium_2sigma + "\\n" +
+        "10%上: " + data.strike_10percent + " → プレミアム: " + data.premium_10percent;
+}
+
 </script>
 
 </body>
