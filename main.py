@@ -410,6 +410,50 @@ def bear_call_premium_candidates_new(T: float = 0.1, r: float = 0.001):
     }
 
 # -----------------------------
+# 買いコール候補 API（3年データ × 保険ロジック）
+# -----------------------------
+@app.get("/api/bear_call_long_candidates")
+def bear_call_long_candidates(K_short: float):
+    import pandas as pd
+    import math
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 3年分のデータを取得 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
+
+    # --- 月末終値 ---
+    monthly = hist["Close"].resample("ME").last()
+    returns = monthly.pct_change().dropna()
+
+    # --- 上昇月のみ抽出 ---
+    positive_returns = returns[returns > 0]
+    avg_rise = positive_returns.mean()      # 平均上昇率
+    max_rise = positive_returns.max()       # 最大上昇率（最も上がった月）
+
+    # --- 保険ロジックで距離を決める ---
+    # Wide（最大上昇率）
+    K_wide = K_short * (1 + max_rise)
+
+    # Medium（平均上昇率 × 2）
+    K_medium = K_short * (1 + avg_rise * 2)
+
+    # Narrow（平均上昇率 × 1）
+    K_narrow = K_short * (1 + avg_rise)
+
+    return {
+        "short_strike": K_short,
+        "avg_rise_rate": round(avg_rise, 4),
+        "max_rise_rate": round(max_rise, 4),
+
+        "long_safe": round(K_wide, 2),
+        "long_standard": round(K_medium, 2),
+        "long_aggressive": round(K_narrow, 2)
+    }
+
+# -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -556,6 +600,9 @@ def index():
 
     <button onclick="loadBearCallPremiums()">プレミアム候補を表示</button>
     <pre id="bearCallPremiums"></pre>
+
+    <button onclick="loadBearCallLongCandidates()">買いプット候補を表示</button>
+    <pre id="bearCallLongCandidates"></pre>
 
     <pre id="bearCallResult"></pre>
 </div>
@@ -717,21 +764,39 @@ async function loadBearCallPremiums(){
         " → プレミアム: " + data.premium_aggressive;
 }
 
-
 async function loadBullPutLongCandidates(){
     const K_short = Number(document.getElementById("bp_K_short").value);
 
     const data = await fetch(`/api/bull_put_long_candidates?K_short=${K_short}`)
-        .then(r=>r.json());
+        .then(r => r.json());
 
     document.getElementById("bullPutLongCandidates").textContent =
-        "📌 売りプット: " + data.short_strike + "\\n\\n" +
-        "📌 買いプット候補\\n" +
-        "安全（Wide）: " + data.long_safe + "\\n" +
-        "標準（Medium）: " + data.long_standard + "\\n" +
-        "攻め（Narrow）: " + data.long_aggressive;
+        "📌 売りプット（ショート）: " + data.short_strike + "\n" +
+        "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\n" +
+        "📌 最大下落率（3年・月末）: " + (data.max_drop_rate * 100).toFixed(2) + "%\n\n" +
+
+        "📌 買いプット候補（保険ロジック）\n" +
+        "安全（Wide: 最悪の下落に備える）: " + data.long_safe + "\n" +
+        "標準（Medium: 平均下落 ×2）: " + data.long_standard + "\n" +
+        "攻め（Narrow: 平均下落 ×1）: " + data.long_aggressive;
 }
 
+async function loadBearCallLongCandidates(){
+    const K_short = Number(document.getElementById("bc_K_short").value);
+
+    const data = await fetch(`/api/bear_call_long_candidates?K_short=${K_short}`)
+        .then(r => r.json());
+
+    document.getElementById("bearCallLongCandidates").textContent =
+        "📌 売りコール（ショート）: " + data.short_strike + "\n" +
+        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\n" +
+        "📌 最大上昇率（3年・月末）: " + (data.max_rise_rate * 100).toFixed(2) + "%\n\n" +
+
+        "📌 買いコール候補（保険ロジック）\n" +
+        "安全（Wide: 最悪の上昇に備える）: " + data.long_safe + "\n" +
+        "標準（Medium: 平均上昇 ×2）: " + data.long_standard + "\n" +
+        "攻め（Narrow: 平均上昇 ×1）: " + data.long_aggressive;
+}
 
 </script>
 
