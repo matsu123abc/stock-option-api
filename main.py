@@ -187,6 +187,56 @@ def bull_put_strikes():
     }
 
 # -----------------------------
+# ベアコールのストライク候補 API（3年データベース）
+# -----------------------------
+@app.get("/api/bear_call_strikes")
+def bear_call_strikes():
+    import pandas as pd
+    import math
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 3年分のデータを確実に取得 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
+
+    # --- 月末終値（pandas 2.0 以降は ME） ---
+    monthly = hist["Close"].resample("ME").last()
+    if len(monthly) < 12:
+        return {"error": "月末データが不足しています"}
+
+    # --- 月次リターン ---
+    returns = monthly.pct_change().dropna()
+    if returns.empty:
+        return {"error": "月次リターンが計算できません"}
+
+    # --- 上昇月のみ抽出 ---
+    positive_returns = returns[returns > 0]
+    if positive_returns.empty:
+        return {"error": "上昇月が存在しません"}
+
+    avg_rise = positive_returns.mean()
+
+    # --- 現在値 ---
+    S = ticker.info.get("regularMarketPrice")
+    if S is None:
+        return {"error": "現在値が取得できません"}
+
+    # --- ストライク計算（ブルプットと対称） ---
+    K_safe = S * (1 + avg_rise)
+    K_super_safe = S * (1 + avg_rise * 1.5)
+    K_aggressive = S * (1 + avg_rise * 0.7)
+
+    return {
+        "S": round(S, 2),
+        "avg_rise_rate": round(avg_rise, 4),
+        "strike_safe": round(K_safe, 2),
+        "strike_super_safe": round(K_super_safe, 2),
+        "strike_aggressive": round(K_aggressive, 2)
+    }
+
+# -----------------------------
 # ⑦ 買いプット候補 API
 # -----------------------------
 @app.get("/api/bull_put_long_candidates")
@@ -519,6 +569,20 @@ async function loadBullPutStrikes(){
         "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
         "やや攻め（0.7倍）: " + data.strike_aggressive;
 }
+
+async function loadBearCallStrikes(){
+    const data = await fetch(`/api/bear_call_strikes`).then(r => r.json());
+
+    document.getElementById("bearCallStrikes").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
+        "📌 ストライク候補（ベアコール：3年データベース）\\n" +
+        "安全（平均上昇率）: " + data.strike_safe + "\\n" +
+        "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
+        "やや攻め（0.7倍）: " + data.strike_aggressive;
+}
+
 
 async function loadBearCallPremiums(){
     const T = 0.1;
