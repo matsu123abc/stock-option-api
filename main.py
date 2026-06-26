@@ -134,20 +134,47 @@ def bear_call(S: float, K_short: float, K_long: float,
 # -----------------------------
 @app.get("/api/bull_put_strikes")
 def bull_put_strikes():
+    import pandas as pd
+
     ticker = yf.Ticker("^N225")
-    hist = ticker.history(period="3y")
 
-    monthly = hist["Close"].resample("M").last()
+    try:
+        hist = ticker.history(period="3y")
+    except Exception as e:
+        return {"error": f"yfinance error: {str(e)}"}
 
-    if len(monthly) < 24:
-        return {"error": "データ不足（24ヶ月未満）"}
+    # データが空の場合
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
 
+    # 月末終値
+    try:
+        monthly = hist["Close"].resample("M").last()
+    except Exception as e:
+        return {"error": f"resample error: {str(e)}"}
+
+    if len(monthly) < 12:
+        return {"error": "月末データが不足しています"}
+
+    # 月次リターン
     returns = monthly.pct_change().dropna()
+
+    if returns.empty:
+        return {"error": "月次リターンが計算できません"}
+
     negative_returns = returns[returns < 0]
+
+    if negative_returns.empty:
+        return {"error": "下落月が存在しません"}
+
     avg_drop = negative_returns.mean()
 
+    # 現在値
     S = ticker.info.get("regularMarketPrice")
+    if S is None:
+        return {"error": "現在値が取得できません"}
 
+    # ストライク計算
     K_safe = S * (1 + avg_drop)
     K_super_safe = S * (1 + avg_drop * 1.5)
     K_aggressive = S * (1 + avg_drop * 0.7)
@@ -159,7 +186,6 @@ def bull_put_strikes():
         "strike_super_safe": round(K_super_safe, 2),
         "strike_aggressive": round(K_aggressive, 2)
     }
-
 
 # -----------------------------
 # ⑦ 買いプット候補 API
