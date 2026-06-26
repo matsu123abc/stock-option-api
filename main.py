@@ -1,9 +1,11 @@
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from math import log, sqrt, exp
 from scipy.stats import norm
 import yfinance as yf
 import numpy as np
+import pandas as pd
 
 app = FastAPI()
 
@@ -128,143 +130,48 @@ def bear_call(S: float, K_short: float, K_long: float,
 
 
 # -----------------------------
-# ⑥ ブルプットのストライク候補 API（現在値 S と σ）
+# ⑥ ブルプットのストライク候補 API（3年間の月末終値ベース）
 # -----------------------------
 @app.get("/api/bull_put_strikes")
-def bull_put_strikes(T: float = 0.1):
-    import math
+def bull_put_strikes():
+    ticker = yf.Ticker("^N225")
+    hist = ticker.history(period="3y")
 
-    yf_ticker = yf.Ticker("^N225")
-    info = yf_ticker.info
-    S = info.get("regularMarketPrice")
+    monthly = hist["Close"].resample("M").last()
 
-    hist = yf_ticker.history(period="21d")
-    close = hist["Close"].values
-    log_returns = np.log(close[1:] / close[:-1])
-    sigma = np.std(log_returns) * np.sqrt(252)
+    if len(monthly) < 24:
+        return {"error": "データ不足（24ヶ月未満）"}
 
-    one_sigma = S * (1 - sigma * math.sqrt(T))
-    two_sigma = S * (1 - 2 * sigma * math.sqrt(T))
-    ten_percent = S * 0.90
+    returns = monthly.pct_change().dropna()
+    negative_returns = returns[returns < 0]
+    avg_drop = negative_returns.mean()
+
+    S = ticker.info.get("regularMarketPrice")
+
+    K_safe = S * (1 + avg_drop)
+    K_super_safe = S * (1 + avg_drop * 1.5)
+    K_aggressive = S * (1 + avg_drop * 0.7)
 
     return {
         "S": round(S, 2),
-        "sigma": round(sigma, 4),
-        "safe_1sigma": round(one_sigma, 2),
-        "super_safe_2sigma": round(two_sigma, 2),
-        "aggressive_10percent": round(ten_percent, 2)
+        "avg_drop_rate": round(avg_drop, 4),
+        "strike_safe": round(K_safe, 2),
+        "strike_super_safe": round(K_super_safe, 2),
+        "strike_aggressive": round(K_aggressive, 2)
     }
 
 
 # -----------------------------
-# ⑦ ベアコールのストライク候補 API（現在値 S と σ）
+# ⑦ 買いプット候補 API
 # -----------------------------
-@app.get("/api/bear_call_strikes")
-def bear_call_strikes(T: float = 0.1):
-    import math
-
-    yf_ticker = yf.Ticker("^N225")
-    info = yf_ticker.info
-    S = info.get("regularMarketPrice")
-
-    hist = yf_ticker.history(period="21d")
-    close = hist["Close"].values
-    log_returns = np.log(close[1:] / close[:-1])
-    sigma = np.std(log_returns) * np.sqrt(252)
-
-    one_sigma = S * (1 + sigma * math.sqrt(T))
-    two_sigma = S * (1 + 2 * sigma * math.sqrt(T))
-    ten_percent = S * 1.10
-
-    return {
-        "S": round(S, 2),
-        "sigma": round(sigma, 4),
-        "safe_1sigma": round(one_sigma, 2),
-        "super_safe_2sigma": round(two_sigma, 2),
-        "aggressive_10percent": round(ten_percent, 2)
-    }
-
-@app.get("/api/bull_put_premium_candidates")
-def bull_put_premium_candidates(T: float = 0.1, r: float = 0.001):
-    import math
-
-    # 現在値とボラティリティ
-    yf_ticker = yf.Ticker("^N225")
-    info = yf_ticker.info
-    S = info.get("regularMarketPrice")
-
-    hist = yf_ticker.history(period="21d")
-    close = hist["Close"].values
-    log_returns = np.log(close[1:] / close[:-1])
-    sigma = np.std(log_returns) * np.sqrt(252)
-
-    # ストライク候補
-    K1 = S * (1 - sigma * math.sqrt(T))      # 1σ
-    K2 = S * (1 - 2 * sigma * math.sqrt(T))  # 2σ
-    K3 = S * 0.90                             # 10%下
-
-    # プット価格（BSモデル）
-    def put_price(S, K, T, r, sigma):
-        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
-        d2 = d1 - sigma*math.sqrt(T)
-        return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
-
-    return {
-        "S": round(S, 2),
-        "sigma": round(sigma, 4),
-        "strike_1sigma": round(K1, 2),
-        "premium_1sigma": round(put_price(S, K1, T, r, sigma), 2),
-        "strike_2sigma": round(K2, 2),
-        "premium_2sigma": round(put_price(S, K2, T, r, sigma), 2),
-        "strike_10percent": round(K3, 2),
-        "premium_10percent": round(put_price(S, K3, T, r, sigma), 2)
-    }
-
-@app.get("/api/bear_call_premium_candidates")
-def bear_call_premium_candidates(T: float = 0.1, r: float = 0.001):
-    import math
-
-    # 現在値とボラティリティ
-    yf_ticker = yf.Ticker("^N225")
-    info = yf_ticker.info
-    S = info.get("regularMarketPrice")
-
-    hist = yf_ticker.history(period="21d")
-    close = hist["Close"].values
-    log_returns = np.log(close[1:] / close[:-1])
-    sigma = np.std(log_returns) * np.sqrt(252)
-
-    # ストライク候補
-    K1 = S * (1 + sigma * math.sqrt(T))      # 1σ
-    K2 = S * (1 + 2 * sigma * math.sqrt(T))  # 2σ
-    K3 = S * 1.10                             # 10%上
-
-    # コール価格（BSモデル）
-    def call_price(S, K, T, r, sigma):
-        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
-        d2 = d1 - sigma*math.sqrt(T)
-        return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)
-
-    return {
-        "S": round(S, 2),
-        "sigma": round(sigma, 4),
-        "strike_1sigma": round(K1, 2),
-        "premium_1sigma": round(call_price(S, K1, T, r, sigma), 2),
-        "strike_2sigma": round(K2, 2),
-        "premium_2sigma": round(call_price(S, K2, T, r, sigma), 2),
-        "strike_10percent": round(K3, 2),
-        "premium_10percent": round(call_price(S, K3, T, r, sigma), 2)
-    }
-
 @app.get("/api/bull_put_long_candidates")
 def bull_put_long_candidates(K_short: float):
     return {
         "short_strike": K_short,
-        "long_safe": K_short - 4000,     # 安全
-        "long_standard": K_short - 2000, # 標準
-        "long_aggressive": K_short - 1000 # 攻め
+        "long_safe": K_short - 4000,
+        "long_standard": K_short - 2000,
+        "long_aggressive": K_short - 1000
     }
-
 
 
 # -----------------------------
@@ -449,16 +356,15 @@ async function onMenuChange(){
 }
 
 async function loadBullPutStrikes(){
-    const T = 0.1;
-    const data = await fetch(`/api/bull_put_strikes?T=${T}`).then(r=>r.json());
+    const data = await fetch(`/api/bull_put_strikes`).then(r=>r.json());
 
     document.getElementById("bullPutStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
-        "📌 ボラティリティ σ: " + data.sigma + "\\n\\n" +
-        "📌 ストライク候補（ブルプット）\\n" +
-        "安全（1σ）: " + data.safe_1sigma + "\\n" +
-        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
-        "やや攻め（10%下）: " + data.aggressive_10percent;
+        "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n\\n" +
+        "📌 ストライク候補（ブルプット：下落率ベース）\\n" +
+        "安全（平均下落率）: " + data.strike_safe + "\\n" +
+        "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
+        "やや攻め（0.7倍）: " + data.strike_aggressive;
 }
 
 async function loadBearCallStrikes(){
