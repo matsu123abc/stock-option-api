@@ -662,29 +662,6 @@ async function loadBearCallStrikes(){
         "やや攻め（0.7倍）: " + data.strike_aggressive;
 }
 
-
-async function loadBearCallPremiums(){
-    const T = 0.1;
-
-    const data = await fetch(`/api/bear_call_premium_candidates_new?T=${T}`)
-        .then(r => r.json());
-
-    document.getElementById("bearCallPremiums").textContent =
-        "📌 現在値 S: " + data.S + "\\n" +
-        "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n" +
-        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
-
-        "📌 プレミアム候補（ベアコール：3年データベース）\\n" +
-        "安全（平均上昇率）: " + data.strike_safe +
-        " → プレミアム: " + data.premium_safe + "\\n" +
-
-        "超安全（1.5倍）: " + data.strike_super_safe +
-        " → プレミアム: " + data.premium_super_safe + "\\n" +
-
-        "やや攻め（0.7倍）: " + data.strike_aggressive +
-        " → プレミアム: " + data.premium_aggressive;
-}
-
 async function calcBullPut(){
     const S = Number(document.getElementById("bp_S").value || 0);
     const K_short = Number(document.getElementById("bp_K_short").value);
