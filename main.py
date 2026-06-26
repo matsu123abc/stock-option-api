@@ -138,43 +138,42 @@ def bull_put_strikes():
 
     ticker = yf.Ticker("^N225")
 
+    # --- 3年分のデータを確実に取得 ---
     try:
-        hist = ticker.history(period="3y")
+        hist = ticker.history(period="1095d", interval="1d")
     except Exception as e:
         return {"error": f"yfinance error: {str(e)}"}
 
-    # データが空の場合
     if hist is None or hist.empty:
-        return {"error": "yfinance がデータを取得できませんでした"}
+        return {"error": "yfinance が 3年分のデータを取得できませんでした"}
 
-    # 月末終値
+    # --- 月末終値（pandas 2.0 以降は 'ME' を使用） ---
     try:
-        monthly = hist["Close"].resample("M").last()
+        monthly = hist["Close"].resample("ME").last()
     except Exception as e:
         return {"error": f"resample error: {str(e)}"}
 
     if len(monthly) < 12:
         return {"error": "月末データが不足しています"}
 
-    # 月次リターン
+    # --- 月次リターン ---
     returns = monthly.pct_change().dropna()
-
     if returns.empty:
         return {"error": "月次リターンが計算できません"}
 
+    # --- 下落月のみ抽出 ---
     negative_returns = returns[returns < 0]
-
     if negative_returns.empty:
         return {"error": "下落月が存在しません"}
 
     avg_drop = negative_returns.mean()
 
-    # 現在値
+    # --- 現在値 ---
     S = ticker.info.get("regularMarketPrice")
     if S is None:
         return {"error": "現在値が取得できません"}
 
-    # ストライク計算
+    # --- ストライク計算 ---
     K_safe = S * (1 + avg_drop)
     K_super_safe = S * (1 + avg_drop * 1.5)
     K_aggressive = S * (1 + avg_drop * 0.7)
