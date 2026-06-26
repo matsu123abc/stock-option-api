@@ -568,6 +568,12 @@ def index():
     <button onclick="loadBullPutPremiums()">プレミアム候補を表示</button>
     <pre id="bullPutPremiums"></pre>
 
+    <div style="font-size:20px; margin-top:10px; color:#333;">
+    📘 買いプット候補の出し方<br>
+    1. 売りプットのストライク（K_short）を入力してください。<br>
+    2. 「買いプット候補を表示」を押すと、過去3年の下落率から自動計算されます。
+    </div>
+
     <button onclick="loadBullPutLongCandidates()">買いプット候補を表示</button>
     <pre id="bullPutLongCandidates"></pre>
 
@@ -600,6 +606,12 @@ def index():
 
     <button onclick="loadBearCallPremiums()">プレミアム候補を表示</button>
     <pre id="bearCallPremiums"></pre>
+
+    <div style="font-size:20px; margin-top:10px; color:#333;">
+    📘 買いプット候補の出し方<br>
+    1. 売りプットのストライク（K_short）を入力してください。<br>
+    2. 「買いプット候補を表示」を押すと、過去3年の下落率から自動計算されます。
+    </div>
 
     <button onclick="loadBearCallLongCandidates()">買いプット候補を表示</button>
     <pre id="bearCallLongCandidates"></pre>
