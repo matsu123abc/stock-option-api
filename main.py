@@ -261,6 +261,73 @@ def bull_put_premium_candidates_new(T: float = 0.1, r: float = 0.001):
     }
 
 # -----------------------------
+# ベアコールのストライク & プレミアム候補 API（3年データベース）
+# -----------------------------
+@app.get("/api/bear_call_premium_candidates_new")
+def bear_call_premium_candidates_new(T: float = 0.1, r: float = 0.001):
+    import pandas as pd
+    import math
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 3年分のデータを確実に取得 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
+
+    # --- 月末終値（pandas 2.0 以降は ME） ---
+    monthly = hist["Close"].resample("ME").last()
+    if len(monthly) < 12:
+        return {"error": "月末データが不足しています"}
+
+    # --- 月次リターン ---
+    returns = monthly.pct_change().dropna()
+    if returns.empty:
+        return {"error": "月次リターンが計算できません"}
+
+    # --- 上昇月のみ抽出 ---
+    positive_returns = returns[returns > 0]
+    if positive_returns.empty:
+        return {"error": "上昇月が存在しません"}
+
+    avg_rise = positive_returns.mean()
+
+    # --- ボラティリティ推定（年率換算） ---
+    sigma_monthly = returns.std()
+    sigma = sigma_monthly * math.sqrt(12)
+
+    # --- 現在値 ---
+    S = ticker.info.get("regularMarketPrice")
+    if S is None:
+        return {"error": "現在値が取得できません"}
+
+    # --- ストライク（上昇率ベース） ---
+    K_safe = S * (1 + avg_rise)
+    K_super_safe = S * (1 + avg_rise * 1.5)
+    K_aggressive = S * (1 + avg_rise * 0.7)
+
+    # --- コール価格（BSモデル） ---
+    def call_price(S, K, T, r, sigma):
+        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+        d2 = d1 - sigma*math.sqrt(T)
+        return S*norm.cdf(d1) - K*math.exp(-r*T)*norm.cdf(d2)
+
+    return {
+        "S": round(S, 2),
+        "sigma_estimated": round(sigma, 4),
+        "avg_rise_rate": round(avg_rise, 4),
+
+        "strike_safe": round(K_safe, 2),
+        "premium_safe": round(call_price(S, K_safe, T, r, sigma), 2),
+
+        "strike_super_safe": round(K_super_safe, 2),
+        "premium_super_safe": round(call_price(S, K_super_safe, T, r, sigma), 2),
+
+        "strike_aggressive": round(K_aggressive, 2),
+        "premium_aggressive": round(call_price(S, K_aggressive, T, r, sigma), 2)
+    }
+
+# -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -453,17 +520,26 @@ async function loadBullPutStrikes(){
         "やや攻め（0.7倍）: " + data.strike_aggressive;
 }
 
-async function loadBearCallStrikes(){
+async function loadBearCallPremiums(){
     const T = 0.1;
-    const data = await fetch(`/api/bear_call_strikes?T=${T}`).then(r=>r.json());
 
-    document.getElementById("bearCallStrikes").textContent =
+    const data = await fetch(`/api/bear_call_premium_candidates_new?T=${T}`)
+        .then(r => r.json());
+
+    document.getElementById("bearCallPremiums").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
-        "📌 ボラティリティ σ: " + data.sigma + "\\n\\n" +
-        "📌 ストライク候補（ベアコール）\\n" +
-        "安全（1σ）: " + data.safe_1sigma + "\\n" +
-        "超安全（2σ）: " + data.super_safe_2sigma + "\\n" +
-        "やや攻め（10%上）: " + data.aggressive_10percent;
+        "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n" +
+        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
+        "📌 プレミアム候補（ベアコール：3年データベース）\\n" +
+        "安全（平均上昇率）: " + data.strike_safe +
+        " → プレミアム: " + data.premium_safe + "\\n" +
+
+        "超安全（1.5倍）: " + data.strike_super_safe +
+        " → プレミアム: " + data.premium_super_safe + "\\n" +
+
+        "やや攻め（0.7倍）: " + data.strike_aggressive +
+        " → プレミアム: " + data.premium_aggressive;
 }
 
 async function calcBullPut(){
@@ -525,16 +601,26 @@ async function loadBullPutPremiums(){
 
 async function loadBearCallPremiums(){
     const T = 0.1;   // 残存日数（年換算）
-    const data = await fetch(`/api/bear_call_premium_candidates?T=${T}`).then(r=>r.json());
+
+    const data = await fetch(`/api/bear_call_premium_candidates_new?T=${T}`)
+        .then(r => r.json());
 
     document.getElementById("bearCallPremiums").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
-        "📌 σ: " + data.sigma + "\\n\\n" +
-        "📌 プレミアム候補（ベアコール）\\n" +
-        "1σ ストライク: " + data.strike_1sigma + " → プレミアム: " + data.premium_1sigma + "\\n" +
-        "2σ ストライク: " + data.strike_2sigma + " → プレミアム: " + data.premium_2sigma + "\\n" +
-        "10%上: " + data.strike_10percent + " → プレミアム: " + data.premium_10percent;
+        "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n" +
+        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
+        "📌 プレミアム候補（ベアコール：3年データベース）\\n" +
+        "安全（平均上昇率）: " + data.strike_safe +
+        " → プレミアム: " + data.premium_safe + "\\n" +
+
+        "超安全（1.5倍）: " + data.strike_super_safe +
+        " → プレミアム: " + data.premium_super_safe + "\\n" +
+
+        "やや攻め（0.7倍）: " + data.strike_aggressive +
+        " → プレミアム: " + data.premium_aggressive;
 }
+
 
 async function loadBullPutLongCandidates(){
     const K_short = Number(document.getElementById("bp_K_short").value);
