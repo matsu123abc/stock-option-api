@@ -237,15 +237,47 @@ def bear_call_strikes():
     }
 
 # -----------------------------
-# ⑦ 買いプット候補 API
+# 買いプット候補 API（3年データ × 保険ロジック）
 # -----------------------------
 @app.get("/api/bull_put_long_candidates")
 def bull_put_long_candidates(K_short: float):
+    import pandas as pd
+    import math
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 3年分のデータを取得 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
+
+    # --- 月末終値 ---
+    monthly = hist["Close"].resample("ME").last()
+    returns = monthly.pct_change().dropna()
+
+    # --- 下落月のみ抽出 ---
+    negative_returns = returns[returns < 0]
+    avg_drop = negative_returns.mean()      # 平均下落率
+    max_drop = negative_returns.min()       # 最大下落率（最悪の月）
+
+    # --- 保険ロジックで距離を決める ---
+    # Wide（最悪の下落率）
+    K_wide = K_short * (1 + max_drop)
+
+    # Medium（平均下落率 × 2）
+    K_medium = K_short * (1 + avg_drop * 2)
+
+    # Narrow（平均下落率 × 1）
+    K_narrow = K_short * (1 + avg_drop)
+
     return {
         "short_strike": K_short,
-        "long_safe": K_short - 4000,
-        "long_standard": K_short - 2000,
-        "long_aggressive": K_short - 1000
+        "avg_drop_rate": round(avg_drop, 4),
+        "max_drop_rate": round(max_drop, 4),
+
+        "long_safe": round(K_wide, 2),
+        "long_standard": round(K_medium, 2),
+        "long_aggressive": round(K_narrow, 2)
     }
 
 # -----------------------------
