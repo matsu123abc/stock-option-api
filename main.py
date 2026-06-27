@@ -454,6 +454,51 @@ def bear_call_long_candidates(K_short: float):
     }
 
 # -----------------------------
+# 買いプット理論価格 API（任意の K_long）
+# -----------------------------
+@app.get("/api/bull_put_long_premium")
+def bull_put_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
+    import pandas as pd
+    import math
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 3年分のデータを取得 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "yfinance がデータを取得できませんでした"}
+
+    # --- 月末終値 ---
+    monthly = hist["Close"].resample("ME").last()
+    returns = monthly.pct_change().dropna()
+    if returns.empty:
+        return {"error": "月次リターンが計算できません"}
+
+    # --- ボラティリティ推定（年率換算） ---
+    sigma_monthly = returns.std()
+    sigma = sigma_monthly * math.sqrt(12)
+
+    # --- 現在値 S ---
+    S = ticker.info.get("regularMarketPrice")
+    if S is None:
+        return {"error": "現在値が取得できません"}
+
+    # --- プット理論価格（BSモデル） ---
+    def put_price(S, K, T, r, sigma):
+        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+        d2 = d1 - sigma*math.sqrt(T)
+        return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
+
+    premium = put_price(S, K_long, T, r, sigma)
+
+    return {
+        "S": round(S, 2),
+        "sigma_estimated": round(sigma, 4),
+        "K_long": round(K_long, 2),
+        "premium_theoretical": round(premium, 2)
+    }
+
+# -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -576,6 +621,8 @@ def index():
 
     <button onclick="loadBullPutLongCandidates()">買いプット候補を表示</button>
     <pre id="bullPutLongCandidates"></pre>
+
+    <button onclick="calcBullPutLongPremium()">買いプット理論価格を自動計算</button>
 
     <pre id="bullPutResult"></pre>
 </div>
@@ -785,6 +832,22 @@ async function loadBearCallLongCandidates(){
         "安全（Wide: 最悪の上昇に備える）: " + data.long_safe + "\\n" +
         "標準（Medium: 平均上昇 ×2）: " + data.long_standard + "\\n" +
         "攻め（Narrow: 平均上昇 ×1）: " + data.long_aggressive;
+}
+
+async function calcBullPutLongPremium(){
+    const K_long = Number(document.getElementById("bp_K_long").value);
+    const T = 0.1;  // 残存期間（年換算）
+
+    const data = await fetch(`/api/bull_put_long_premium?K_long=${K_long}&T=${T}`)
+        .then(r => r.json());
+
+    if(data.error){
+        alert("エラー: " + data.error);
+        return;
+    }
+
+    // 買いプットのプレミアム欄に自動入力
+    document.getElementById("bp_premium_long").value = data.premium_theoretical;
 }
 
 </script>
