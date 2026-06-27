@@ -565,18 +565,27 @@ def bear_call_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
     }
 
 # -----------------------------
-# market_insights API
+# market_insights API（Main.py 用）
 # -----------------------------
-from fastapi import APIRouter
+
 import numpy as np
 
-router = APIRouter()
+# ▼ 株価取得（章さんの既存ロジックに置き換えてOK）
+def get_nk225_price():
+    return 32100  # ダミー値。実際は章さんのAPIロジックを使う
 
-# 章さんの既存 API を利用
-from .nk225 import get_nk225_price, get_volatility_20d
-from .historical import get_monthly_prices_1y
+# ▼ ボラティリティ取得（章さんの既存ロジックに置き換えてOK）
+def get_volatility_20d():
+    return 0.182  # ダミー値。実際は章さんのAPIロジックを使う
 
-# 損益計算（既存ロジックと同じ）
+# ▼ 過去1年の月末データ（12個）
+def get_monthly_prices_1y():
+    return [
+        27393, 27945, 28041, 28856, 30887, 33189,
+        33172, 32619, 31857, 30707, 33431, 33464
+    ]
+
+# ▼ 損益計算（既存ロジック）
 def bull_put_pnl(S, K_short, K_long, credit):
     if S >= K_short:
         return credit
@@ -591,43 +600,40 @@ def bear_call_pnl(S, K_short, K_long, credit):
         return credit - (K_long - K_short)
     return credit - (S - K_short)
 
-@router.get("/api/market_insights")
+# ▼ Main.py では router ではなく app を使う
+@app.get("/api/market_insights")
 def market_insights():
 
-    # ▼ 現在の株価・ボラティリティ
+    # 現在の株価・ボラティリティ
     S = get_nk225_price()
     sigma = get_volatility_20d()
 
-    # ▼ 過去1年の月末データ（12個）
-    prices = get_monthly_prices_1y()   # 例: [32000, 32500, ...]
+    # 過去1年の月末データ
+    prices = get_monthly_prices_1y()
     if len(prices) < 12:
         return {"error": "過去データ不足"}
 
-    # ▼ 月次リターン（上昇率・下落率）
-    returns = []
-    for i in range(len(prices) - 1):
-        r = (prices[i+1] - prices[i]) / prices[i]
-        returns.append(r)
+    # 月次リターン
+    returns = [(prices[i+1] - prices[i]) / prices[i] for i in range(11)]
 
     avg_rise = np.mean([r for r in returns if r > 0]) if any(r > 0 for r in returns) else 0
     avg_drop = np.mean([r for r in returns if r < 0]) if any(r < 0 for r in returns) else 0
     max_rise = max(returns)
     max_drop = min(returns)
 
-    # ▼ 過去1年のレンジ
+    # 過去1年レンジ
     range_low = min(prices)
     range_high = max(prices)
     position_percent = (S - range_low) / (range_high - range_low + 1e-9)
 
-    # ▼ σ の位置（過去1年比）
-    # ※ 過去のσデータが無い場合は簡易的に「中央値付近」とする
+    # σ の位置（簡易）
     sigma_percentile = 0.5
 
-    # ▼ 簡易バックテスト（ブルプット・ベアコール）
+    # バックテスト
     bull_results = []
     bear_results = []
 
-    for i in range(len(prices) - 1):
+    for i in range(11):
         S_entry = prices[i]
         S_exit = prices[i+1]
 
@@ -646,7 +652,7 @@ def market_insights():
     bull_win_rate = sum(1 for x in bull_results if x > 0) / len(bull_results)
     bear_win_rate = sum(1 for x in bear_results if x > 0) / len(bear_results)
 
-    # ▼ 戦略ヒント（簡易版）
+    # 戦略ヒント
     hint = []
     if position_percent > 0.7:
         hint.append("現在値はレンジ上限に近い → ベアコール有利")
@@ -659,8 +665,6 @@ def market_insights():
         hint.append("ボラティリティが高い → クレジットスプレッド有利")
     else:
         hint.append("ボラティリティが低い → デビットスプレッド有利")
-
-    hint_text = " / ".join(hint)
 
     return {
         "S": S,
@@ -675,8 +679,9 @@ def market_insights():
         "range_high": range_high,
         "position_percent": position_percent,
         "sigma_percentile": sigma_percentile,
-        "hint_text": hint_text
+        "hint_text": " / ".join(hint)
     }
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
