@@ -578,7 +578,7 @@ def index():
 <title>日経225 オプション分析ツール</title>
 
 <!-- Chart.js 読み込み -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js"></script>
 
 <style>
   :root{
