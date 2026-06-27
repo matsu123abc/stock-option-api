@@ -618,6 +618,54 @@ def bear_call_pnl(S, K_short, K_long, credit):
         return credit - (K_long - K_short)
     return credit - (S - K_short)
 
+def gpt_market_hint(S, sigma, avg_rise, avg_drop,
+                    bull_win_rate, bear_win_rate, position_percent):
+
+    client = AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
+
+    prompt = f"""
+あなたはオプション戦略の専門家です。
+以下の市場データをもとに、最適な戦略ヒントを3〜5行で説明してください。
+
+返答は必ず次の JSON 形式のみで返してください。
+JSON の前後に説明文を付けないこと。
+
+{{
+  "hint": "戦略ヒントを3〜5行で記述"
+}}
+
+株価: {S}
+ボラティリティ: {sigma}
+平均上昇率: {avg_rise}
+平均下落率: {avg_drop}
+ブルプット勝率: {bull_win_rate}
+ベアコール勝率: {bear_win_rate}
+現在値の位置: {position_percent}
+"""
+
+    try:
+        res = client.chat.completions.create(
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+
+        raw = res.choices[0].message.content.strip()
+
+        # JSON抽出
+        json_start = raw.find("{")
+        json_end = raw.rfind("}") + 1
+        json_text = raw[json_start:json_end]
+        json_text = json_text.replace("```json", "").replace("```", "").strip()
+
+        return json.loads(json_text)["hint"]
+
+    except Exception as e:
+        return f"GPTエラー: {str(e)}"
 
 # ▼ Main.py では router ではなく app を使う
 @app.get("/api/market_insights")
@@ -671,20 +719,13 @@ def market_insights():
     bull_win_rate = sum(1 for x in bull_results if x > 0) / len(bull_results)
     bear_win_rate = sum(1 for x in bear_results if x > 0) / len(bear_results)
 
-    # 戦略ヒント
-    hint = []
-    if position_percent > 0.7:
-        hint.append("現在値はレンジ上限に近い → ベアコール有利")
-    elif position_percent < 0.3:
-        hint.append("現在値はレンジ下限に近い → ブルプット有利")
-    else:
-        hint.append("現在値は中間 → どちらも選択可能")
+    # ▼ GPT 戦略ヒント生成（ここが新しい）
+    hint_text = gpt_market_hint(
+        S, sigma, avg_rise, avg_drop,
+        bull_win_rate, bear_win_rate, position_percent
+    )
 
-    if sigma > 0.20:
-        hint.append("ボラティリティが高い → クレジットスプレッド有利")
-    else:
-        hint.append("ボラティリティが低い → デビットスプレッド有利")
-
+    # ▼ JSON 返却
     return {
         "S": S,
         "sigma": sigma,
@@ -698,7 +739,7 @@ def market_insights():
         "range_high": range_high,
         "position_percent": position_percent,
         "sigma_percentile": sigma_percentile,
-        "hint_text": " / ".join(hint)
+        "hint_text": hint_text
     }
 
 # -----------------------------
