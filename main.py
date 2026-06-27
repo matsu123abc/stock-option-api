@@ -728,7 +728,7 @@ def index():
     2. 「買いプット候補を表示」を押すと、過去3年の下落率から自動計算されます。
     </div>
 
-    <button onclick="loadBearCallLongCandidates()">買いコール候補を表示</button>
+    <button onclick="loadBearCallLongCandidates()">買いプット候補を表示</button>
     <pre id="bearCallLongCandidates"></pre>
 
     <button onclick="calcBearCallLongPremium()">買いコールプレミアムを自動計算</button>
@@ -875,17 +875,15 @@ async function loadBullPutLongCandidates(){
     const data = await fetch(`/api/bull_put_long_candidates?K_short=${K_short}`)
         .then(r => r.json());
 
-    const text =
-        "📌 売りプット(ショート): " + data.short_strike + "\n" +
-        "📌 平均下落率(3年・月末): " + (data.avg_drop_rate * 100).toFixed(2) + "%\n" +
-        "📌 最大下落率(3年・月末): " + (data.max_drop_rate * 100).toFixed(2) + "%\n\n" +
+    document.getElementById("bullPutLongCandidates").textContent =
+        "📌 売りプット（ショート）: " + data.short_strike + "\\n" +
+        "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n" +
+        "📌 最大下落率（3年・月末）: " + (data.max_drop_rate * 100).toFixed(2) + "%\\n\\n" +
 
-        "📌 買いプット候補(保険ロジック)\n" +
-        "安全(最大損失が最小): " + data.long_aggressive + "\n" +
-        "標準(バランス型): " + data.long_standard + "\n" +
-        "下落に強いが損失幅が大きい: " + data.long_safe;
-
-    document.getElementById("bullPutLongCandidates").textContent = text;
+        "📌 買いプット候補（保険ロジック）\\n" +
+        "安全（Wide: 最悪の下落に備える）: " + data.long_safe + "\\n" +
+        "標準（Medium: 平均下落 ×2）: " + data.long_standard + "\\n" +
+        "攻め（Narrow: 平均下落 ×1）: " + data.long_aggressive;
 }
 
 async function loadBearCallLongCandidates(){
@@ -894,17 +892,15 @@ async function loadBearCallLongCandidates(){
     const data = await fetch(`/api/bear_call_long_candidates?K_short=${K_short}`)
         .then(r => r.json());
 
-    const text =
-        "📌 売りコール(ショート): " + data.short_strike + "\n" +
-        "📌 平均上昇率(3年・月末): " + (data.avg_rise_rate * 100).toFixed(2) + "%\n" +
-        "📌 最大上昇率(3年・月末): " + (data.max_rise_rate * 100).toFixed(2) + "%\n\n" +
+    document.getElementById("bearCallLongCandidates").textContent =
+        "📌 売りコール（ショート）: " + data.short_strike + "\\n" +
+        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n" +
+        "📌 最大上昇率（3年・月末）: " + (data.max_rise_rate * 100).toFixed(2) + "%\\n\\n" +
 
-        "📌 買いコール候補(保険ロジック)\n" +
-        "安全(最大損失が最小): " + data.long_aggressive + "\n" +
-        "標準(バランス型): " + data.long_standard + "\n" +
-        "上昇に強いが損失幅が大きい: " + data.long_safe;
-
-    document.getElementById("bearCallLongCandidates").textContent = text;
+        "📌 買いコール候補（保険ロジック）\\n" +
+        "安全（Wide: 最悪の上昇に備える）: " + data.long_safe + "\\n" +
+        "標準（Medium: 平均上昇 ×2）: " + data.long_standard + "\\n" +
+        "攻め（Narrow: 平均上昇 ×1）: " + data.long_aggressive;
 }
 
 async function calcBullPutLongPremium(){
