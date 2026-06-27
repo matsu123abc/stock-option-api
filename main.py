@@ -636,18 +636,24 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
 以下の市場データを分析し、
 1. 最適な戦略（ベアコール / ブルプット など）
 2. 専門家としての判断理由（2〜3行）
-3. 初心者向けに、できるだけわかりやすく噛み砕いた解説（3〜6行）
+3. 初心者向けに、できるだけ噛み砕いた解説（3〜6行）
 4. 初心者が注意すべきポイント（1〜2行）
+5. 読みが外れた場合の「次の一手（Plan B）」を提案（3〜5行）
+   - ロールアップ
+   - ロールアウト
+   - 反対側スプレッド追加（アイアンコンドル化）
+   - デルタ調整
+   - 損切り
+   などから最適なものを選び、理由も説明する
 
-を JSON 形式で返してください。
-
-返答は必ず次の形式のみ：
+返答は必ず次の JSON 形式のみ：
 
 {{
   "strategy": "戦略名",
   "expert_reason": "専門家としての理由を2〜3行で",
   "beginner_explanation": "初心者向けに3〜6行でわかりやすく解説",
-  "beginner_caution": "初心者が注意すべきポイントを1〜2行で"
+  "beginner_caution": "初心者が注意すべきポイントを1〜2行で",
+  "next_step": "読みが外れた場合の次の一手を3〜5行で"
 }}
 
 【市場データ】
@@ -679,9 +685,8 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
         return data
 
     except Exception as e:
-        return f"GPTエラー: {str(e)}"
+        return {"error": f"GPTエラー: {str(e)}"}
 
-# ▼ Main.py では router ではなく app を使う
 @app.get("/api/market_insights")
 def market_insights():
 
@@ -758,7 +763,8 @@ def market_insights():
         "strategy": hint_data.get("strategy"),
         "expert_reason": hint_data.get("expert_reason"),
         "beginner_explanation": hint_data.get("beginner_explanation"),
-        "beginner_caution": hint_data.get("beginner_caution")
+        "beginner_caution": hint_data.get("beginner_caution"),
+        "next_step": hint_data.get("next_step")
     }
 
 # -----------------------------
