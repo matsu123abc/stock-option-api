@@ -595,10 +595,13 @@ def get_monthly_prices_1y():
     ticker = yf.Ticker("^N225")
     hist = ticker.history(period="1y")
 
-    # 月末終値を抽出
-    monthly = hist["Close"].resample("M").last()
-    return monthly.astype(int).tolist()
+    if hist.empty:
+        return []
 
+    # Pandas 2.2 以降は "M" が廃止 → "ME" を使う
+    monthly = hist["Close"].resample("ME").last()
+
+    return monthly.astype(int).tolist()
 
 # ▼ 損益計算（既存ロジック）
 def bull_put_pnl(S, K_short, K_long, credit):
