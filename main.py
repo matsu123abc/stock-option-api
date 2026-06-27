@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from math import log, sqrt, exp
@@ -570,15 +569,13 @@ def bear_call_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return """<!DOCTYPE html>
+    return """
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>日経225 オプション分析ツール</title>
-
-<!-- Chart.js 読み込み -->
-<script src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js"></script>
 
 <style>
   :root{
@@ -677,9 +674,6 @@ def index():
     <button onclick="calcBullPut()">ブル・プット損益計算</button>
     <pre id="bullPutResult"></pre>
 
-    <!-- ▼ グラフ表示領域 ▼ -->
-    <canvas id="bullPutChart" width="400" height="250"></canvas>
-
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
     <pre id="bullPutStrikes"></pre>
 
@@ -696,6 +690,7 @@ def index():
     <pre id="bullPutLongCandidates"></pre>
 
     <button onclick="calcBullPutLongPremium()">買いプットプレミアムを自動計算</button>
+    
 </div>
 
 <!-- ★ ベアコール UI ★ -->
@@ -720,9 +715,6 @@ def index():
     <button onclick="calcBearCall()">ベア・コール損益計算</button>
     <pre id="bearCallResult"></pre>
 
-    <!-- ▼ グラフ表示領域 ▼ -->
-    <canvas id="bearCallChart" width="400" height="250"></canvas>
-
     <button onclick="loadBearCallStrikes()">ストライク候補を表示</button>
     <pre id="bearCallStrikes"></pre>
 
@@ -732,19 +724,19 @@ def index():
     <div style="font-size:20px; margin-top:10px; color:#333;">
     📘 買いコール候補の出し方<br>
     1. 売りコールのストライク（K_short）を入力してください。<br>
-    2. 「買いコール候補を表示」を押すと、過去3年の上昇率から自動計算されます。
+    2. 「買いコール候補を表示」を押すと、過去3年の下落率から自動計算されます。
     </div>
 
     <button onclick="loadBearCallLongCandidates()">買いコール候補を表示</button>
     <pre id="bearCallLongCandidates"></pre>
 
     <button onclick="calcBearCallLongPremium()">買いコールプレミアムを自動計算</button>
-</div>
+
+    </div>
 
 <hr>
 
 <script>
-/* メニュー切替 */
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
@@ -772,111 +764,6 @@ async function onMenuChange(){
         "📌 メニュー: " + menu;
 }
 
-/* 共通：損益グラフ描画関数 */
-function drawPnLChart(prices, profits, canvasId){
-    if(window[canvasId]){
-        window[canvasId].destroy();
-    }
-
-    window[canvasId] = new Chart(
-        document.getElementById(canvasId),
-        {
-            type: "line",
-            data: {
-                labels: prices,
-                datasets: [{
-                    label: "損益（円）",
-                    data: profits,
-                    borderColor: "red",
-                    borderWidth: 2,
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { title: { display: true, text: "満期時の日経225" } },
-                    y: { title: { display: true, text: "損益（円）" } }
-                }
-            }
-        }
-    );
-}
-
-/* 戦略別：損益計算関数 */
-function calcBullPutPnL(S, K_short, K_long, credit){
-    if(S >= K_short) return credit;
-    if(S <= K_long) return credit - (K_short - K_long);
-    return credit - (K_short - S);
-}
-
-function calcBearCallPnL(S, K_short, K_long, credit){
-    if(S <= K_short) return credit;
-    if(S >= K_long) return credit - (K_long - K_short);
-    return credit - (S - K_short);
-}
-
-/* ブルプット損益計算（グラフ付き） */
-async function calcBullPut(){
-    const S = Number(document.getElementById("bp_S").value || 0);
-    const K_short = Number(document.getElementById("bp_K_short").value);
-    const K_long = Number(document.getElementById("bp_K_long").value);
-    const premium_short = Number(document.getElementById("bp_premium_short").value);
-    const premium_long = Number(document.getElementById("bp_premium_long").value);
-
-    const url = `/api/bull_put?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
-    const data = await fetch(url).then(r=>r.json());
-
-    document.getElementById("bullPutResult").textContent =
-        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
-        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
-        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
-        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
-        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
-
-    const credit = premium_short - premium_long;
-    const prices = [];
-    const profits = [];
-
-    for(let x = K_long - 3000; x <= K_short + 3000; x += 100){
-        prices.push(x);
-        profits.push(calcBullPutPnL(x, K_short, K_long, credit));
-    }
-
-    drawPnLChart(prices, profits, "bullPutChart");
-}
-
-/* ベアコール損益計算（グラフ付き） */
-async function calcBearCall(){
-    const S = Number(document.getElementById("bc_S").value || 0);
-    const K_short = Number(document.getElementById("bc_K_short").value);
-    const K_long = Number(document.getElementById("bc_K_long").value);
-    const premium_short = Number(document.getElementById("bc_premium_short").value);
-    const premium_long = Number(document.getElementById("bc_premium_long").value);
-
-    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
-    const data = await fetch(url).then(r=>r.json());
-
-    document.getElementById("bearCallResult").textContent =
-        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
-        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
-        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
-        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
-        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
-
-    const credit = premium_short - premium_long;
-    const prices = [];
-    const profits = [];
-
-    for(let x = K_short - 3000; x <= K_long + 3000; x += 100){
-        prices.push(x);
-        profits.push(calcBearCallPnL(x, K_short, K_long, credit));
-    }
-
-    drawPnLChart(prices, profits, "bearCallChart");
-}
-
-/* 既存の各種 API 呼び出し関数 */
 async function loadBullPutStrikes(){
     const data = await fetch(`/api/bull_put_strikes`).then(r=>r.json());
 
@@ -895,10 +782,47 @@ async function loadBearCallStrikes(){
     document.getElementById("bearCallStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
         "📌 ストライク候補（ベアコール：3年データベース）\\n" +
         "安全（平均上昇率）: " + data.strike_safe + "\\n" +
         "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
         "やや攻め（0.7倍）: " + data.strike_aggressive;
+}
+
+async function calcBullPut(){
+    const S = Number(document.getElementById("bp_S").value || 0);
+    const K_short = Number(document.getElementById("bp_K_short").value);
+    const K_long = Number(document.getElementById("bp_K_long").value);
+    const premium_short = Number(document.getElementById("bp_premium_short").value);
+    const premium_long = Number(document.getElementById("bp_premium_long").value);
+
+    const url = `/api/bull_put?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bullPutResult").textContent =
+        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
+        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
+        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
+        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
+        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
+}
+
+async function calcBearCall(){
+    const S = Number(document.getElementById("bc_S").value || 0);
+    const K_short = Number(document.getElementById("bc_K_short").value);
+    const K_long = Number(document.getElementById("bc_K_long").value);
+    const premium_short = Number(document.getElementById("bc_premium_short").value);
+    const premium_long = Number(document.getElementById("bc_premium_long").value);
+
+    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const data = await fetch(url).then(r=>r.json());
+
+    document.getElementById("bearCallResult").textContent =
+        "受取クレジット: " + data.credit.toFixed(2) + "\\n" +
+        "最大利益: " + data.max_profit.toFixed(2) + "\\n" +
+        "最大損失: " + data.max_loss.toFixed(2) + "\\n" +
+        "損益分岐点: " + data.breakeven.toFixed(2) + "\\n" +
+        "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
 
 async function loadBullPutPremiums(){
@@ -910,11 +834,14 @@ async function loadBullPutPremiums(){
     document.getElementById("bullPutPremiums").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n\\n" +
+
         "📌 プレミアム候補（ブルプット：3年データベース）\\n" +
         "安全（平均下落率）: " + data.strike_safe +
         " → プレミアム: " + data.premium_safe + "\\n" +
+
         "超安全（1.5倍）: " + data.strike_super_safe +
         " → プレミアム: " + data.premium_super_safe + "\\n" +
+
         "やや攻め（0.7倍）: " + data.strike_aggressive +
         " → プレミアム: " + data.premium_aggressive;
 }
@@ -929,11 +856,14 @@ async function loadBearCallPremiums(){
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
         "📌 プレミアム候補（ベアコール：3年データベース）\\n" +
         "安全（平均上昇率）: " + data.strike_safe +
         " → プレミアム: " + data.premium_safe + "\\n" +
+
         "超安全（1.5倍）: " + data.strike_super_safe +
         " → プレミアム: " + data.premium_super_safe + "\\n" +
+
         "やや攻め（0.7倍）: " + data.strike_aggressive +
         " → プレミアム: " + data.premium_aggressive;
 }
@@ -948,6 +878,7 @@ async function loadBullPutLongCandidates(){
         "📌 売りプット（ショート）: " + data.short_strike + "\\n" +
         "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n" +
         "📌 最大下落率（3年・月末）: " + (data.max_drop_rate * 100).toFixed(2) + "%\\n\\n" +
+
         "📌 買いプット候補（保険ロジック）\\n" +
         "安全（Wide: 最悪の下落に備える）: " + data.long_safe + "\\n" +
         "標準（Medium: 平均下落 ×2）: " + data.long_standard + "\\n" +
@@ -964,6 +895,7 @@ async function loadBearCallLongCandidates(){
         "📌 売りコール（ショート）: " + data.short_strike + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n" +
         "📌 最大上昇率（3年・月末）: " + (data.max_rise_rate * 100).toFixed(2) + "%\\n\\n" +
+
         "📌 買いコール候補（保険ロジック）\\n" +
         "安全（Wide: 最悪の上昇に備える）: " + data.long_safe + "\\n" +
         "標準（Medium: 平均上昇 ×2）: " + data.long_standard + "\\n" +
@@ -972,7 +904,7 @@ async function loadBearCallLongCandidates(){
 
 async function calcBullPutLongPremium(){
     const K_long = Number(document.getElementById("bp_K_long").value);
-    const T = 0.1;
+    const T = 0.1;  // 残存期間（年換算）
 
     const data = await fetch(`/api/bull_put_long_premium?K_long=${K_long}&T=${T}`)
         .then(r => r.json());
@@ -982,6 +914,7 @@ async function calcBullPutLongPremium(){
         return;
     }
 
+    // 買いプットのプレミアム欄に自動入力
     document.getElementById("bp_premium_long").value = data.premium_theoretical;
 }
 
@@ -997,6 +930,7 @@ async function calcBearCallLongPremium(){
         return;
     }
 
+    // 買いコールのプレミアム欄に自動入力
     document.getElementById("bc_premium_long").value = data.premium_theoretical;
 }
 
