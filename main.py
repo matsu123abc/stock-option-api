@@ -786,7 +786,7 @@ def market_insights():
         hint_data.setdefault("beginner_caution", "")
         hint_data.setdefault("next_step", "")
 
-    # ▼ JSON 返却（gpt_meta にデバッグ情報を含める）
+    # ▼ JSON 返却（互換性のため旧キーも追加）
     return {
         "S": S,
         "sigma": sigma,
@@ -801,14 +801,16 @@ def market_insights():
         "position_percent": position_percent,
         "sigma_percentile": sigma_percentile,
 
-        # ▼ GPT 初心者向けモードの返却項目
+        # 新しいキー（推奨）
         "strategy": hint_data.get("strategy", ""),
         "expert_reason": hint_data.get("expert_reason", ""),
         "beginner_explanation": hint_data.get("beginner_explanation", ""),
         "beginner_caution": hint_data.get("beginner_caution", ""),
         "next_step": hint_data.get("next_step", ""),
 
-        # ▼ デバッグ用メタ情報（UIで表示しない設定にするのが望ましい）
+        # 互換性のための旧キー（フロントが古いキーを参照している場合に備える）
+        "hint": hint_data,                          # オブジェクトそのまま
+        "hint_text": json.dumps(hint_data, ensure_ascii=False),  # 文字列化した JSON
         "gpt_meta": {
             "error": hint_data.get("error", ""),
             "raw": hint_data.get("raw", "")
