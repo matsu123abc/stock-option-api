@@ -672,20 +672,30 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
         )
-
         raw = res.choices[0].message.content.strip()
 
-        # JSON抽出
+        # JSON抽出（より堅牢に）
         json_start = raw.find("{")
         json_end = raw.rfind("}") + 1
+        if json_start == -1 or json_end == -1:
+            return {"error": "no_json_found", "raw": raw}
+
         json_text = raw[json_start:json_end]
         json_text = json_text.replace("```json", "").replace("```", "").strip()
 
-        data = json.loads(json_text)
-        return data
+        try:
+            data = json.loads(json_text)
+        except Exception as e:
+            return {"error": "json_parse_error", "exception": str(e), "raw": raw, "json_text": json_text}
+
+        # 必須キーを保証して返す（欠けているキーは空文字で埋める）
+        keys = ["strategy", "expert_reason", "beginner_explanation", "beginner_caution", "next_step"]
+        safe_data = {k: data.get(k, "") for k in keys}
+        return safe_data
 
     except Exception as e:
-        return {"error": f"GPTエラー: {str(e)}"}
+        return {"error": "api_exception", "exception": str(e)}
+
 
 @app.get("/api/market_insights")
 def market_insights():
@@ -744,7 +754,39 @@ def market_insights():
         bull_win_rate, bear_win_rate, position_percent
     )
 
-    # ▼ JSON 返却
+    # デバッグ出力（短期的に有効。必要なら logging に置き換えてください）
+    print("DEBUG hint_data type:", type(hint_data))
+    print("DEBUG hint_data content:", hint_data)
+
+    # 安全なデフォルトを用意する
+    default_hint = {
+        "strategy": "",
+        "expert_reason": "",
+        "beginner_explanation": "戦略ヒントを生成できませんでした。サーバログを確認してください。",
+        "beginner_caution": "",
+        "next_step": ""
+    }
+
+    # hint_data が dict でない場合はフォールバック
+    if not isinstance(hint_data, dict):
+        print("GPT returned non-dict hint_data. Falling back.")
+        hint_data = {"error": str(hint_data)}
+        hint_data.update(default_hint)
+
+    # GPT 側でエラー情報を返している場合の処理
+    if hint_data.get("error"):
+        print("GPT error detected:", hint_data.get("error"))
+        # raw があればログに出す
+        if hint_data.get("raw"):
+            print("GPT raw response:", hint_data.get("raw"))
+        # 必要に応じて UI に見せる簡潔なメッセージを設定
+        hint_data.setdefault("strategy", "")
+        hint_data.setdefault("expert_reason", "")
+        hint_data.setdefault("beginner_explanation", "戦略ヒントを生成できませんでした（詳細はサーバログ）。")
+        hint_data.setdefault("beginner_caution", "")
+        hint_data.setdefault("next_step", "")
+
+    # ▼ JSON 返却（gpt_meta にデバッグ情報を含める）
     return {
         "S": S,
         "sigma": sigma,
@@ -760,12 +802,19 @@ def market_insights():
         "sigma_percentile": sigma_percentile,
 
         # ▼ GPT 初心者向けモードの返却項目
-        "strategy": hint_data.get("strategy"),
-        "expert_reason": hint_data.get("expert_reason"),
-        "beginner_explanation": hint_data.get("beginner_explanation"),
-        "beginner_caution": hint_data.get("beginner_caution"),
-        "next_step": hint_data.get("next_step")
+        "strategy": hint_data.get("strategy", ""),
+        "expert_reason": hint_data.get("expert_reason", ""),
+        "beginner_explanation": hint_data.get("beginner_explanation", ""),
+        "beginner_caution": hint_data.get("beginner_caution", ""),
+        "next_step": hint_data.get("next_step", ""),
+
+        # ▼ デバッグ用メタ情報（UIで表示しない設定にするのが望ましい）
+        "gpt_meta": {
+            "error": hint_data.get("error", ""),
+            "raw": hint_data.get("raw", "")
+        }
     }
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
