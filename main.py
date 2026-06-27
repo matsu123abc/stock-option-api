@@ -875,15 +875,17 @@ async function loadBullPutLongCandidates(){
     const data = await fetch(`/api/bull_put_long_candidates?K_short=${K_short}`)
         .then(r => r.json());
 
-    document.getElementById("bullPutLongCandidates").textContent =
-        "📌 売りプット（ショート）: " + data.short_strike + "\n" +
-        "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\n" +
-        "📌 最大下落率（3年・月末）: " + (data.max_drop_rate * 100).toFixed(2) + "%\n\n" +
+    const text =
+        "📌 売りプット(ショート): " + data.short_strike + "\n" +
+        "📌 平均下落率(3年・月末): " + (data.avg_drop_rate * 100).toFixed(2) + "%\n" +
+        "📌 最大下落率(3年・月末): " + (data.max_drop_rate * 100).toFixed(2) + "%\n\n" +
 
-        "📌 買いプット候補（保険ロジック）\n" +
-        "安全（最大損失が最小）: " + data.long_aggressive + "\n" +   // Narrow
-        "標準（バランス型）: " + data.long_standard + "\n" +          // Medium
-        "下落に強いが損失幅が大きい: " + data.long_safe;               // Wide
+        "📌 買いプット候補(保険ロジック)\n" +
+        "安全(最大損失が最小): " + data.long_aggressive + "\n" +
+        "標準(バランス型): " + data.long_standard + "\n" +
+        "下落に強いが損失幅が大きい: " + data.long_safe;
+
+    document.getElementById("bullPutLongCandidates").textContent = text;
 }
 
 async function loadBearCallLongCandidates(){
@@ -892,15 +894,17 @@ async function loadBearCallLongCandidates(){
     const data = await fetch(`/api/bear_call_long_candidates?K_short=${K_short}`)
         .then(r => r.json());
 
-    document.getElementById("bearCallLongCandidates").textContent =
-        "📌 売りコール（ショート）: " + data.short_strike + "\n" +
-        "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\n" +
-        "📌 最大上昇率（3年・月末）: " + (data.max_rise_rate * 100).toFixed(2) + "%\n\n" +
+    const text =
+        "📌 売りコール(ショート): " + data.short_strike + "\n" +
+        "📌 平均上昇率(3年・月末): " + (data.avg_rise_rate * 100).toFixed(2) + "%\n" +
+        "📌 最大上昇率(3年・月末): " + (data.max_rise_rate * 100).toFixed(2) + "%\n\n" +
 
-        "📌 買いコール候補（保険ロジック）\n" +
-        "安全（最大損失が最小）: " + data.long_aggressive + "\n" +   // Narrow
-        "標準（バランス型）: " + data.long_standard + "\n" +          // Medium
-        "上昇に強いが損失幅が大きい: " + data.long_safe;               // Wide
+        "📌 買いコール候補(保険ロジック)\n" +
+        "安全(最大損失が最小): " + data.long_aggressive + "\n" +
+        "標準(バランス型): " + data.long_standard + "\n" +
+        "上昇に強いが損失幅が大きい: " + data.long_safe;
+
+    document.getElementById("bearCallLongCandidates").textContent = text;
 }
 
 async function calcBullPutLongPremium(){
