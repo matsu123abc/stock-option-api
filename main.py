@@ -675,7 +675,8 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
         json_text = raw[json_start:json_end]
         json_text = json_text.replace("```json", "").replace("```", "").strip()
 
-        return json.loads(json_text)["hint"]
+        data = json.loads(json_text)
+        return data
 
     except Exception as e:
         return f"GPTエラー: {str(e)}"
@@ -732,8 +733,8 @@ def market_insights():
     bull_win_rate = sum(1 for x in bull_results if x > 0) / len(bull_results)
     bear_win_rate = sum(1 for x in bear_results if x > 0) / len(bear_results)
 
-    # ▼ GPT 戦略ヒント生成（ここが新しい）
-    hint_text = gpt_market_hint(
+    # ▼ GPT 初心者向け戦略ヒント（JSON全体を受け取る）
+    hint_data = gpt_market_hint(
         S, sigma, avg_rise, avg_drop,
         bull_win_rate, bear_win_rate, position_percent
     )
@@ -752,7 +753,12 @@ def market_insights():
         "range_high": range_high,
         "position_percent": position_percent,
         "sigma_percentile": sigma_percentile,
-        "hint_text": hint_text
+
+        # ▼ GPT 初心者向けモードの返却項目
+        "strategy": hint_data.get("strategy"),
+        "expert_reason": hint_data.get("expert_reason"),
+        "beginner_explanation": hint_data.get("beginner_explanation"),
+        "beginner_caution": hint_data.get("beginner_caution")
     }
 
 # -----------------------------
