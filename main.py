@@ -565,25 +565,40 @@ def bear_call_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
     }
 
 # -----------------------------
-# market_insights API（Main.py 用）
+# market_insights API（最新データ対応）
 # -----------------------------
 
 import numpy as np
+import yfinance as yf
 
-# ▼ 株価取得（章さんの既存ロジックに置き換えてOK）
+# ▼ 最新の株価を取得（既存APIと同じロジック）
 def get_nk225_price():
-    return 32100  # ダミー値。実際は章さんのAPIロジックを使う
+    ticker = yf.Ticker("^N225")
+    info = ticker.info
+    return info.get("regularMarketPrice")
 
-# ▼ ボラティリティ取得（章さんの既存ロジックに置き換えてOK）
+# ▼ 最新のボラティリティを取得（既存APIと同じロジック）
 def get_volatility_20d():
-    return 0.182  # ダミー値。実際は章さんのAPIロジックを使う
+    ticker = yf.Ticker("^N225")
+    hist = ticker.history(period="21d")
 
-# ▼ 過去1年の月末データ（12個）
+    if len(hist) < 2:
+        return None
+
+    close = hist["Close"].values
+    log_returns = np.log(close[1:] / close[:-1])
+    vol = np.std(log_returns) * np.sqrt(252)
+    return float(vol)
+
+# ▼ 過去1年の月末データを取得（自動）
 def get_monthly_prices_1y():
-    return [
-        27393, 27945, 28041, 28856, 30887, 33189,
-        33172, 32619, 31857, 30707, 33431, 33464
-    ]
+    ticker = yf.Ticker("^N225")
+    hist = ticker.history(period="1y")
+
+    # 月末終値を抽出
+    monthly = hist["Close"].resample("M").last()
+    return monthly.astype(int).tolist()
+
 
 # ▼ 損益計算（既存ロジック）
 def bull_put_pnl(S, K_short, K_long, credit):
@@ -600,21 +615,22 @@ def bear_call_pnl(S, K_short, K_long, credit):
         return credit - (K_long - K_short)
     return credit - (S - K_short)
 
+
 # ▼ Main.py では router ではなく app を使う
 @app.get("/api/market_insights")
 def market_insights():
 
-    # 現在の株価・ボラティリティ
+    # 現在の株価・ボラティリティ（最新）
     S = get_nk225_price()
     sigma = get_volatility_20d()
 
-    # 過去1年の月末データ
+    # 過去1年の月末データ（最新）
     prices = get_monthly_prices_1y()
     if len(prices) < 12:
         return {"error": "過去データ不足"}
 
     # 月次リターン
-    returns = [(prices[i+1] - prices[i]) / prices[i] for i in range(11)]
+    returns = [(prices[i+1] - prices[i]) / prices[i] for i in range(len(prices)-1)]
 
     avg_rise = np.mean([r for r in returns if r > 0]) if any(r > 0 for r in returns) else 0
     avg_drop = np.mean([r for r in returns if r < 0]) if any(r < 0 for r in returns) else 0
@@ -633,7 +649,7 @@ def market_insights():
     bull_results = []
     bear_results = []
 
-    for i in range(11):
+    for i in range(len(prices)-1):
         S_entry = prices[i]
         S_exit = prices[i+1]
 
@@ -681,7 +697,6 @@ def market_insights():
         "sigma_percentile": sigma_percentile,
         "hint_text": " / ".join(hint)
     }
-
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
