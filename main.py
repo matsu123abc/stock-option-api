@@ -456,47 +456,61 @@ def bear_call_long_candidates(K_short: float):
 # -----------------------------
 # 買いプット理論価格 API（任意の K_long）
 # -----------------------------
+from scipy.stats import norm
+import yfinance as yf
+import math
+import pandas as pd
+
 @app.get("/api/bull_put_long_premium")
 def bull_put_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
-    import pandas as pd
-    import math
 
+    # --- 日経225の現在値（info は不安定なので history から取得） ---
     ticker = yf.Ticker("^N225")
+    try:
+        S = ticker.history(period="1d")["Close"].iloc[-1]
+    except:
+        return {"error": "現在値が取得できません（history 失敗）"}
 
-    # --- 3年分のデータを取得 ---
+    if S is None:
+        return {"error": "現在値が取得できません（None）"}
+
+    # --- 過去3年のデータからボラティリティ推定 ---
     hist = ticker.history(period="1095d", interval="1d")
     if hist is None or hist.empty:
         return {"error": "yfinance がデータを取得できませんでした"}
 
-    # --- 月末終値 ---
-    monthly = hist["Close"].resample("ME").last()
+    try:
+        monthly = hist["Close"].resample("ME").last()
+    except:
+        return {"error": "月末終値の計算に失敗しました（resample エラー）"}
+
     returns = monthly.pct_change().dropna()
     if returns.empty:
         return {"error": "月次リターンが計算できません"}
 
-    # --- ボラティリティ推定（年率換算） ---
     sigma_monthly = returns.std()
     sigma = sigma_monthly * math.sqrt(12)
 
-    # --- 現在値 S ---
-    S = ticker.info.get("regularMarketPrice")
-    if S is None:
-        return {"error": "現在値が取得できません"}
-
-    # --- プット理論価格（BSモデル） ---
+    # --- BSモデル（プット） ---
     def put_price(S, K, T, r, sigma):
-        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
-        d2 = d1 - sigma*math.sqrt(T)
-        return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
+        try:
+            d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+            d2 = d1 - sigma*math.sqrt(T)
+            return K*math.exp(-r*T)*norm.cdf(-d2) - S*norm.cdf(-d1)
+        except Exception as e:
+            return None
 
     premium = put_price(S, K_long, T, r, sigma)
+    if premium is None:
+        return {"error": "BSモデル計算中にエラーが発生しました"}
 
     return {
-        "S": round(S, 2),
-        "sigma_estimated": round(sigma, 4),
-        "K_long": round(K_long, 2),
-        "premium_theoretical": round(premium, 2)
+        "S": round(float(S), 2),
+        "sigma_estimated": round(float(sigma), 4),
+        "K_long": round(float(K_long), 2),
+        "premium_theoretical": round(float(premium), 2)
     }
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
