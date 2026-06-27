@@ -565,6 +565,120 @@ def bear_call_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
     }
 
 # -----------------------------
+# market_insights API
+# -----------------------------
+from fastapi import APIRouter
+import numpy as np
+
+router = APIRouter()
+
+# 章さんの既存 API を利用
+from .nk225 import get_nk225_price, get_volatility_20d
+from .historical import get_monthly_prices_1y
+
+# 損益計算（既存ロジックと同じ）
+def bull_put_pnl(S, K_short, K_long, credit):
+    if S >= K_short:
+        return credit
+    if S <= K_long:
+        return credit - (K_short - K_long)
+    return credit - (K_short - S)
+
+def bear_call_pnl(S, K_short, K_long, credit):
+    if S <= K_short:
+        return credit
+    if S >= K_long:
+        return credit - (K_long - K_short)
+    return credit - (S - K_short)
+
+@router.get("/api/market_insights")
+def market_insights():
+
+    # ▼ 現在の株価・ボラティリティ
+    S = get_nk225_price()
+    sigma = get_volatility_20d()
+
+    # ▼ 過去1年の月末データ（12個）
+    prices = get_monthly_prices_1y()   # 例: [32000, 32500, ...]
+    if len(prices) < 12:
+        return {"error": "過去データ不足"}
+
+    # ▼ 月次リターン（上昇率・下落率）
+    returns = []
+    for i in range(len(prices) - 1):
+        r = (prices[i+1] - prices[i]) / prices[i]
+        returns.append(r)
+
+    avg_rise = np.mean([r for r in returns if r > 0]) if any(r > 0 for r in returns) else 0
+    avg_drop = np.mean([r for r in returns if r < 0]) if any(r < 0 for r in returns) else 0
+    max_rise = max(returns)
+    max_drop = min(returns)
+
+    # ▼ 過去1年のレンジ
+    range_low = min(prices)
+    range_high = max(prices)
+    position_percent = (S - range_low) / (range_high - range_low + 1e-9)
+
+    # ▼ σ の位置（過去1年比）
+    # ※ 過去のσデータが無い場合は簡易的に「中央値付近」とする
+    sigma_percentile = 0.5
+
+    # ▼ 簡易バックテスト（ブルプット・ベアコール）
+    bull_results = []
+    bear_results = []
+
+    for i in range(len(prices) - 1):
+        S_entry = prices[i]
+        S_exit = prices[i+1]
+
+        # ブルプット
+        K_short_bp = int(S_entry * 0.97)
+        K_long_bp = K_short_bp - 500
+        pnl_bp = bull_put_pnl(S_exit, K_short_bp, K_long_bp, 200)
+        bull_results.append(pnl_bp)
+
+        # ベアコール
+        K_short_bc = int(S_entry * 1.03)
+        K_long_bc = K_short_bc + 500
+        pnl_bc = bear_call_pnl(S_exit, K_short_bc, K_long_bc, 200)
+        bear_results.append(pnl_bc)
+
+    bull_win_rate = sum(1 for x in bull_results if x > 0) / len(bull_results)
+    bear_win_rate = sum(1 for x in bear_results if x > 0) / len(bear_results)
+
+    # ▼ 戦略ヒント（簡易版）
+    hint = []
+    if position_percent > 0.7:
+        hint.append("現在値はレンジ上限に近い → ベアコール有利")
+    elif position_percent < 0.3:
+        hint.append("現在値はレンジ下限に近い → ブルプット有利")
+    else:
+        hint.append("現在値は中間 → どちらも選択可能")
+
+    if sigma > 0.20:
+        hint.append("ボラティリティが高い → クレジットスプレッド有利")
+    else:
+        hint.append("ボラティリティが低い → デビットスプレッド有利")
+
+    hint_text = " / ".join(hint)
+
+    return {
+        "S": S,
+        "sigma": sigma,
+        "avg_rise": avg_rise,
+        "avg_drop": avg_drop,
+        "max_rise": max_rise,
+        "max_drop": max_drop,
+        "bull_put_win_rate": bull_win_rate,
+        "bear_call_win_rate": bear_win_rate,
+        "range_low": range_low,
+        "range_high": range_high,
+        "position_percent": position_percent,
+        "sigma_percentile": sigma_percentile,
+        "hint_text": hint_text
+    }
+
+# -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -651,6 +765,20 @@ def index():
 </select>
 
 <div id="infoBox"></div>
+
+<h3>基本情報（Market Insights）</h3>
+
+<div id="insightsSection" style="display:none;">
+    <button onclick="loadMarketInsights()">最新情報を取得</button>
+
+    <div id="insightsBox" style="
+        background:#f2f2f2;
+        padding:16px;
+        border-radius:10px;
+        margin-top:16px;
+        font-size:22px;
+    "></div>
+</div>
 
 <!-- ★ ブルプット UI ★ -->
 <div id="bullPutBox" style="display:none;">
@@ -740,28 +868,23 @@ def index():
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
+    // すべて非表示
+    document.getElementById("insightsSection").style.display = "none";
     document.getElementById("bullPutBox").style.display = "none";
     document.getElementById("bearCallBox").style.display = "none";
 
+    if(menu === "basic"){
+        document.getElementById("insightsSection").style.display = "block";
+        return;
+    }
     if(menu === "bull_put"){
         document.getElementById("bullPutBox").style.display = "block";
+        return;
     }
     if(menu === "bear_call"){
         document.getElementById("bearCallBox").style.display = "block";
-    }
-
-    if(menu === ""){
-        document.getElementById("infoBox").innerHTML = "";
         return;
     }
-
-    const S = await fetch("/api/nk225_params").then(r=>r.json());
-    const V = await fetch("/api/nk225_vol?days=20").then(r=>r.json());
-
-    document.getElementById("infoBox").innerHTML =
-        "📌 株価 S: " + S.price + "<br>" +
-        "📌 ボラティリティ σ: " + V.volatility.toFixed(4) + "<br>" +
-        "📌 メニュー: " + menu;
 }
 
 async function loadBullPutStrikes(){
@@ -932,6 +1055,32 @@ async function calcBearCallLongPremium(){
 
     // 買いコールのプレミアム欄に自動入力
     document.getElementById("bc_premium_long").value = data.premium_theoretical;
+}
+
+async function loadMarketInsights(){
+    const info = await fetch("/api/market_insights").then(r=>r.json());
+
+    document.getElementById("insightsBox").innerHTML = `
+        <b>📌 株価 S:</b> ${info.S}<br>
+        <b>📌 ボラティリティ σ:</b> ${info.sigma.toFixed(4)}<br><br>
+
+        <b>【過去1年の傾向】</b><br>
+        平均上昇率: ${(info.avg_rise * 100).toFixed(2)}%<br>
+        平均下落率: ${(info.avg_drop * 100).toFixed(2)}%<br>
+        最大上昇率: ${(info.max_rise * 100).toFixed(2)}%<br>
+        最大下落率: ${(info.max_drop * 100).toFixed(2)}%<br><br>
+
+        <b>【勝率（簡易バックテスト）】</b><br>
+        ブルプット勝率: ${(info.bull_put_win_rate * 100).toFixed(1)}%<br>
+        ベアコール勝率: ${(info.bear_call_win_rate * 100).toFixed(1)}%<br><br>
+
+        <b>【現在の位置】</b><br>
+        過去1年レンジ: ${info.range_low} ～ ${info.range_high}<br>
+        現在値の位置: ${(info.position_percent * 100).toFixed(1)}%<br><br>
+
+        <b>【戦略ヒント】</b><br>
+        ${info.hint_text}
+    `;
 }
 
 </script>
