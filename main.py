@@ -1,3 +1,4 @@
+import os
 from openai import AzureOpenAI
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
