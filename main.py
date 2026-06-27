@@ -1,4 +1,5 @@
 import os
+import json
 from openai import AzureOpenAI
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -630,16 +631,26 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
     )
 
     prompt = f"""
-あなたはオプション戦略の専門家です。
-以下の市場データをもとに、最適な戦略ヒントを3〜5行で説明してください。
+あなたはオプション戦略の専門家であり、同時に初心者向けの講師でもあります。
 
-返答は必ず次の JSON 形式のみで返してください。
-JSON の前後に説明文を付けないこと。
+以下の市場データを分析し、
+1. 最適な戦略（ベアコール / ブルプット など）
+2. 専門家としての判断理由（2〜3行）
+3. 初心者向けに、できるだけわかりやすく噛み砕いた解説（3〜6行）
+4. 初心者が注意すべきポイント（1〜2行）
+
+を JSON 形式で返してください。
+
+返答は必ず次の形式のみ：
 
 {{
-  "hint": "戦略ヒントを3〜5行で記述"
+  "strategy": "戦略名",
+  "expert_reason": "専門家としての理由を2〜3行で",
+  "beginner_explanation": "初心者向けに3〜6行でわかりやすく解説",
+  "beginner_caution": "初心者が注意すべきポイントを1〜2行で"
 }}
 
+【市場データ】
 株価: {S}
 ボラティリティ: {sigma}
 平均上昇率: {avg_rise}
