@@ -511,6 +511,59 @@ def bull_put_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
         "premium_theoretical": round(float(premium), 2)
     }
 
+# -----------------------------
+# 買いコール理論価格 API（任意の K_long）
+# -----------------------------
+from scipy.stats import norm
+import yfinance as yf
+import math
+import pandas as pd
+
+@app.get("/api/bear_call_long_premium")
+def bear_call_long_premium(K_long: float, T: float = 0.1, r: float = 0.001):
+
+    ticker = yf.Ticker("^N225")
+
+    # --- 現在値 S（info は不安定なので history から取得） ---
+    try:
+        S = ticker.history(period="1d")["Close"].iloc[-1]
+    except:
+        return {"error": "現在値が取得できません"}
+
+    # --- 過去3年のデータからボラティリティ推定 ---
+    hist = ticker.history(period="1095d", interval="1d")
+    if hist is None or hist.empty:
+        return {"error": "価格データが取得できません"}
+
+    try:
+        monthly = hist["Close"].resample("ME").last()
+    except:
+        return {"error": "月末終値の計算に失敗しました"}
+
+    returns = monthly.pct_change().dropna()
+    if returns.empty:
+        return {"error": "月次リターンが計算できません"}
+
+    sigma_monthly = returns.std()
+    sigma = sigma_monthly * math.sqrt(12)
+
+    # --- コール理論価格（BSモデル） ---
+    def call_price(S, K, T, r, sigma):
+        d1 = (math.log(S/K) + (r + sigma*sigma/2)*T) / (sigma*math.sqrt(T))
+        d2 = d1 - sigma*math.sqrt(T)
+        return S * norm.cdf(d1) - K * math.exp(-r*T) * norm.cdf(d2)
+
+    try:
+        premium = call_price(S, K_long, T, r, sigma)
+    except Exception as e:
+        return {"error": f"BSモデル計算中にエラー: {e}"}
+
+    return {
+        "S": round(float(S), 2),
+        "sigma_estimated": round(float(sigma), 4),
+        "K_long": round(float(K_long), 2),
+        "premium_theoretical": round(float(premium), 2)
+    }
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
@@ -620,6 +673,7 @@ def index():
     <input id="bp_premium_long" type="number">
 
     <button onclick="calcBullPut()">ブル・プット損益計算</button>
+    <pre id="bullPutResult"></pre>
 
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
     <pre id="bullPutStrikes"></pre>
@@ -636,9 +690,8 @@ def index():
     <button onclick="loadBullPutLongCandidates()">買いプット候補を表示</button>
     <pre id="bullPutLongCandidates"></pre>
 
-    <button onclick="calcBullPutLongPremium()">買いプット理論価格を自動計算</button>
-
-    <pre id="bullPutResult"></pre>
+    <button onclick="calcBullPutLongPremium()">買いプットプレミアムを自動計算</button>
+    
 </div>
 
 <!-- ★ ベアコール UI ★ -->
@@ -661,6 +714,7 @@ def index():
     <input id="bc_premium_long" type="number">
 
     <button onclick="calcBearCall()">ベア・コール損益計算</button>
+    <pre id="bearCallResult"></pre>
 
     <button onclick="loadBearCallStrikes()">ストライク候補を表示</button>
     <pre id="bearCallStrikes"></pre>
@@ -677,8 +731,9 @@ def index():
     <button onclick="loadBearCallLongCandidates()">買いプット候補を表示</button>
     <pre id="bearCallLongCandidates"></pre>
 
-    <pre id="bearCallResult"></pre>
-</div>
+    <button onclick="calcBearCallLongPremium()">買いコールプレミアムを自動計算</button>
+
+    </div>
 
 <hr>
 
@@ -862,6 +917,22 @@ async function calcBullPutLongPremium(){
 
     // 買いプットのプレミアム欄に自動入力
     document.getElementById("bp_premium_long").value = data.premium_theoretical;
+}
+
+async function calcBearCallLongPremium(){
+    const K_long = Number(document.getElementById("bc_K_long").value);
+    const T = 0.1;
+
+    const data = await fetch(`/api/bear_call_long_premium?K_long=${K_long}&T=${T}`)
+        .then(r => r.json());
+
+    if(data.error){
+        alert("エラー: " + data.error);
+        return;
+    }
+
+    // 買いコールのプレミアム欄に自動入力
+    document.getElementById("bc_premium_long").value = data.premium_theoretical;
 }
 
 </script>
