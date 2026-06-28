@@ -1140,7 +1140,8 @@ def index():
 
 <div id="infoBox"></div>
 
-<h3>基本情報（Market Insights）</h3>
+<!-- 保存ボタン（ページ内の任意の位置に追加） -->
+<button id="btnSaveHtml" onclick="saveAsHtml()">現在の画面をHTMLで保存</button>
 
 <div id="insightsSection" style="display:none;">
     <button onclick="loadMarketInsights()">最新情報を取得</button>
@@ -1581,6 +1582,142 @@ async function calcRolldownPNL(){
         "IV効果: " + data.iv_effect + "%\\n" +
         "市場コメント: " + data.bias_comment;
 }
+
+// HTMLダウンロード用ユーティリティ
+function collectStateForHtml() {
+  // 必要な要素を収集（不足があれば追加してください）
+  const state = {
+    timestamp: new Date().toISOString(),
+    menu: document.getElementById("menu")?.value || "",
+    insightsHtml: document.getElementById("insightsBox")?.innerHTML || "",
+    greeksHtml: document.getElementById("greeksBox")?.innerHTML || "",
+    bullPut: {
+      S: document.getElementById("bp_S")?.value || "",
+      K_short: document.getElementById("bp_K_short")?.value || "",
+      K_long: document.getElementById("bp_K_long")?.value || "",
+      premium_short: document.getElementById("bp_premium_short")?.value || "",
+      premium_long: document.getElementById("bp_premium_long")?.value || "",
+      result: document.getElementById("bullPutResult")?.textContent || "",
+      strikes: document.getElementById("bullPutStrikes")?.textContent || "",
+      premiums: document.getElementById("bullPutPremiums")?.textContent || "",
+      longCandidates: document.getElementById("bullPutLongCandidates")?.textContent || ""
+    },
+    bearCall: {
+      S: document.getElementById("bc_S")?.value || "",
+      K_short: document.getElementById("bc_K_short")?.value || "",
+      K_long: document.getElementById("bc_K_long")?.value || "",
+      premium_short: document.getElementById("bc_premium_short")?.value || "",
+      premium_long: document.getElementById("bc_premium_long")?.value || "",
+      result: document.getElementById("bearCallResult")?.textContent || "",
+      strikes: document.getElementById("bearCallStrikes")?.textContent || "",
+      premiums: document.getElementById("bearCallPremiums")?.textContent || "",
+      longCandidates: document.getElementById("bearCallLongCandidates")?.textContent || ""
+    },
+    rollout: {
+      S: document.getElementById("ro_S")?.value || "",
+      short_put: document.getElementById("ro_K_short")?.value || "",
+      long_put: document.getElementById("ro_K_long")?.value || "",
+      credit: document.getElementById("ro_credit")?.value || "",
+      iv: document.getElementById("ro_iv")?.value || "",
+      market_bias: document.getElementById("ro_bias")?.value || "",
+      candidates: document.getElementById("rolloutCandidates")?.textContent || "",
+      pnl: document.getElementById("rolloutPNL")?.textContent || ""
+    },
+    rolldown: {
+      S: document.getElementById("rd_S")?.value || "",
+      short_put: document.getElementById("rd_K_short")?.value || "",
+      long_put: document.getElementById("rd_K_long")?.value || "",
+      credit: document.getElementById("rd_credit")?.value || "",
+      iv: document.getElementById("rd_iv")?.value || "",
+      market_bias: document.getElementById("rd_bias")?.value || "",
+      candidates: document.getElementById("rolldownCandidates")?.textContent || "",
+      pnl: document.getElementById("rolldownPNL")?.textContent || ""
+    }
+  };
+  return state;
+}
+
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function buildHtmlDocument(state) {
+  // シンプルで読みやすいHTMLを作成
+  const header = `
+    <!doctype html>
+    <html lang="ja">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>保存: 日経225 オプション分析 (${escapeHtml(state.timestamp)})</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",sans-serif;padding:16px;color:#111;background:#fff}
+        h1{font-size:20px;margin-bottom:8px}
+        h2{font-size:16px;margin-top:18px;margin-bottom:6px}
+        pre{background:#f2f2f2;padding:12px;border-radius:8px;white-space:pre-wrap}
+        .box{background:#fafafa;border:1px solid #eee;padding:12px;border-radius:8px;margin-bottom:12px}
+        .meta{font-size:13px;color:#666;margin-bottom:8px}
+      </style>
+    </head>
+    <body>
+      <h1>日経225 オプション分析ツール - 保存データ</h1>
+      <div class="meta">保存日時: ${escapeHtml(state.timestamp)}</div>
+      <div class="box"><strong>選択メニュー:</strong> ${escapeHtml(state.menu)}</div>
+  `;
+
+  const market = `
+    <h2>Market Insights</h2>
+    <div class="box">${state.insightsHtml ? state.insightsHtml : "<pre>—</pre>"}</div>
+    <h2>Greeks</h2>
+    <div class="box">${state.greeksHtml ? state.greeksHtml : "<pre>—</pre>"}</div>
+  `;
+
+  function section(title, obj) {
+    return `
+      <h2>${escapeHtml(title)}</h2>
+      <div class="box">
+        <pre>${escapeHtml(JSON.stringify(obj, null, 2))}</pre>
+      </div>
+    `;
+  }
+
+  const body = header + market
+    + section("ブルプット（入力と結果）", state.bullPut)
+    + section("ベアコール（入力と結果）", state.bearCall)
+    + section("ロールアウト（入力と結果）", state.rollout)
+    + section("ロールダウン（入力と結果）", state.rolldown)
+    + `</body></html>`;
+
+  return body;
+}
+
+function saveAsHtml() {
+  try {
+    const state = collectStateForHtml();
+    const html = buildHtmlDocument(state);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `nikkei_snapshot_${ts}.html`;
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    console.error("HTML保存に失敗しました", e);
+    alert("保存に失敗しました。コンソールを確認してください。");
+  }
+}
+
 </script>
 
 </body>
