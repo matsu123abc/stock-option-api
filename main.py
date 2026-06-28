@@ -696,6 +696,56 @@ def gpt_market_hint(S, sigma, avg_rise, avg_drop,
     except Exception as e:
         return {"error": "api_exception", "exception": str(e)}
 
+def gpt_greeks_comment(delta, gamma, theta, vega, rho):
+    prompt = f"""
+あなたはオプション取引の専門家です。
+以下のギリシャ指標を初心者向けに分かりやすく解説し、
+現在の相場で注意すべき点と、推奨される行動を簡潔に述べてください。
+
+ギリシャ指標:
+Delta: {delta:.4f}
+Gamma: {gamma:.6f}
+Theta: {theta:.4f}
+Vega: {vega:.2f}
+Rho: {rho:.2f}
+
+返答は必ず次の JSON 形式で返してください：
+
+{{
+  "summary": "初心者向けの簡単なまとめ（現在の状態を一言で）",
+  "risk": "現在のリスク要因（ギリシャ指標から読み取れる危険ポイント）",
+  "action": "推奨される行動（維持・ロールアウト・ロールダウン・様子見など）"
+}}
+"""
+
+    client = AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
+
+    try:
+        res = client.chat.completions.create(
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+
+        raw = res.choices[0].message.content.strip()
+
+        # JSON抽出
+        json_start = raw.find("{")
+        json_end = raw.rfind("}") + 1
+        json_text = raw[json_start:json_end]
+
+        return json.loads(json_text)
+
+    except Exception as e:
+        return {
+            "summary": "GPTエラー",
+            "risk": "解析に失敗しました",
+            "action": f"エラー内容: {str(e)}"
+        }
 
 @app.get("/api/market_insights")
 def market_insights():
@@ -1048,7 +1098,45 @@ def rolldown_pnl(data: dict):
         "comment": "ロールダウン後の損益構造を計算しました。"
     }
 
+from fastapi import APIRouter
+import math
+from scipy.stats import norm
 
+router = APIRouter()
+
+@router.get("/api/greeks")
+def calc_greeks(S: float, K: float, T: float, r: float, sigma: float, option_type: str):
+    """
+    S: 現在値
+    K: ストライク
+    T: 残存期間（年）
+    r: 金利（例：0.001）
+    sigma: ボラティリティ（例：0.20）
+    option_type: "call" or "put"
+    """
+
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+
+    if option_type == "call":
+        delta = norm.cdf(d1)
+    else:
+        delta = norm.cdf(d1) - 1
+
+    gamma = norm.pdf(d1) / (S * sigma * math.sqrt(T))
+    theta = -(S * norm.pdf(d1) * sigma) / (2 * math.sqrt(T)) \
+            - r * K * math.exp(-r * T) * norm.cdf(d2 if option_type=="call" else -d2)
+
+    vega = S * norm.pdf(d1) * math.sqrt(T)
+    rho = K * T * math.exp(-r * T) * (norm.cdf(d2) if option_type=="call" else -norm.cdf(-d2))
+
+    return {
+        "delta": delta,
+        "gamma": gamma,
+        "theta": theta,
+        "vega": vega,
+        "rho": rho
+    }
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
@@ -1153,6 +1241,14 @@ def index():
         font-size:22px;
     "></div>
 </div>
+
+<div id="greeksBox" style="
+    background:#f2f2f2;
+    padding:16px;
+    border-radius:10px;
+    margin-top:16px;
+    font-size:22px;
+"></div>
 
 <!-- ★ ブルプット UI ★ -->
 <div id="bullPutBox" style="display:none;">
@@ -1581,6 +1677,42 @@ async function calcRolldownPNL(){
         "IV効果: " + data.iv_effect + "%\\n" +
         "市場コメント: " + data.bias_comment;
 }
+
+async function loadGreeks(){
+    const info = await fetch("/api/market_insights").then(r=>r.json());
+
+    const S = info.S;
+    const sigma = info.sigma;
+    const r = 0.001;
+    const T = 0.1;
+    const K = S;  // ATM近似
+
+    const greeks = await fetch(`/api/greeks?S=${S}&K=${K}&T=${T}&r=${r}&sigma=${sigma}&option_type=put`)
+        .then(r=>r.json());
+
+    document.getElementById("greeksBox").innerHTML = `
+        <b>📘 ギリシャ指標（ATM近似）</b><br>
+        Δ Delta: ${greeks.delta.toFixed(4)}<br>
+        Γ Gamma: ${greeks.gamma.toFixed(6)}<br>
+        Θ Theta: ${greeks.theta.toFixed(4)}<br>
+        ν Vega: ${greeks.vega.toFixed(2)}<br>
+        ρ Rho: ${greeks.rho.toFixed(2)}<br>
+    `;
+}
+
+async function loadMarketInsights(){
+    const info = await fetch("/api/market_insights").then(r=>r.json());
+
+    document.getElementById("insightsBox").innerHTML = `
+        <b>📌 株価 S:</b> ${info.S}<br>
+        <b>📌 ボラティリティ σ:</b> ${info.sigma.toFixed(4)}<br><br>
+        ...
+    `;
+
+    // ★ ギリシャ指標も読み込む
+    loadGreeks();
+}
+
 </script>
 
 </body>
