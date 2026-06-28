@@ -1295,13 +1295,16 @@ def index():
 <hr>
 
 <script>
+/* 共通: メニュー切替 */
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
-    // すべて非表示
+    // すべて非表示（必ずここに追加したボックスを含める）
     document.getElementById("insightsSection").style.display = "none";
     document.getElementById("bullPutBox").style.display = "none";
     document.getElementById("bearCallBox").style.display = "none";
+    document.getElementById("rolloutBox").style.display = "none";
+    document.getElementById("rolldownBox").style.display = "none";
 
     if(menu === "basic"){
         document.getElementById("insightsSection").style.display = "block";
@@ -1325,9 +1328,9 @@ async function onMenuChange(){
     }
 }
 
+/* ブルプット / ベアコール 関数群（テンプレートリテラルを使わない） */
 async function loadBullPutStrikes(){
     const data = await fetch(`/api/bull_put_strikes`).then(r=>r.json());
-
     document.getElementById("bullPutStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n\\n" +
@@ -1339,11 +1342,9 @@ async function loadBullPutStrikes(){
 
 async function loadBearCallStrikes(){
     const data = await fetch(`/api/bear_call_strikes`).then(r => r.json());
-
     document.getElementById("bearCallStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
-
         "📌 ストライク候補（ベアコール：3年データベース）\\n" +
         "安全（平均上昇率）: " + data.strike_safe + "\\n" +
         "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
@@ -1357,7 +1358,7 @@ async function calcBullPut(){
     const premium_short = Number(document.getElementById("bp_premium_short").value);
     const premium_long = Number(document.getElementById("bp_premium_long").value);
 
-    const url = `/api/bull_put?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const url = "/api/bull_put?S=" + S + "&K_short=" + K_short + "&K_long=" + K_long + "&premium_short=" + premium_short + "&premium_long=" + premium_long;
     const data = await fetch(url).then(r=>r.json());
 
     document.getElementById("bullPutResult").textContent =
@@ -1375,7 +1376,7 @@ async function calcBearCall(){
     const premium_short = Number(document.getElementById("bc_premium_short").value);
     const premium_long = Number(document.getElementById("bc_premium_long").value);
 
-    const url = `/api/bear_call?S=${S}&K_short=${K_short}&K_long=${K_long}&premium_short=${premium_short}&premium_long=${premium_long}`;
+    const url = "/api/bear_call?S=" + S + "&K_short=" + K_short + "&K_long=" + K_long + "&premium_short=" + premium_short + "&premium_long=" + premium_long;
     const data = await fetch(url).then(r=>r.json());
 
     document.getElementById("bearCallResult").textContent =
@@ -1386,60 +1387,46 @@ async function calcBearCall(){
         "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
 
+/* プレミアム候補等（省略せずそのまま） */
 async function loadBullPutPremiums(){
     const T = 0.1;
-
-    const data = await fetch(`/api/bull_put_premium_candidates_new?T=${T}`)
-        .then(r => r.json());
-
+    const data = await fetch("/api/bull_put_premium_candidates_new?T=" + T).then(r => r.json());
     document.getElementById("bullPutPremiums").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n\\n" +
-
         "📌 プレミアム候補（ブルプット：3年データベース）\\n" +
         "安全（平均下落率）: " + data.strike_safe +
         " → プレミアム: " + data.premium_safe + "\\n" +
-
         "超安全（1.5倍）: " + data.strike_super_safe +
         " → プレミアム: " + data.premium_super_safe + "\\n" +
-
         "やや攻め（0.7倍）: " + data.strike_aggressive +
         " → プレミアム: " + data.premium_aggressive;
 }
 
 async function loadBearCallPremiums(){
     const T = 0.1;
-
-    const data = await fetch(`/api/bear_call_premium_candidates_new?T=${T}`)
-        .then(r => r.json());
-
+    const data = await fetch("/api/bear_call_premium_candidates_new?T=" + T).then(r => r.json());
     document.getElementById("bearCallPremiums").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 推定ボラティリティ σ: " + data.sigma_estimated + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
-
         "📌 プレミアム候補（ベアコール：3年データベース）\\n" +
         "安全（平均上昇率）: " + data.strike_safe +
         " → プレミアム: " + data.premium_safe + "\\n" +
-
         "超安全（1.5倍）: " + data.strike_super_safe +
         " → プレミアム: " + data.premium_super_safe + "\\n" +
-
         "やや攻め（0.7倍）: " + data.strike_aggressive +
         " → プレミアム: " + data.premium_aggressive;
 }
 
+/* ロング候補・プレミアム自動計算 */
 async function loadBullPutLongCandidates(){
     const K_short = Number(document.getElementById("bp_K_short").value);
-
-    const data = await fetch(`/api/bull_put_long_candidates?K_short=${K_short}`)
-        .then(r => r.json());
-
+    const data = await fetch("/api/bull_put_long_candidates?K_short=" + K_short).then(r => r.json());
     document.getElementById("bullPutLongCandidates").textContent =
         "📌 売りプット（ショート）: " + data.short_strike + "\\n" +
         "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n" +
         "📌 最大下落率（3年・月末）: " + (data.max_drop_rate * 100).toFixed(2) + "%\\n\\n" +
-
         "📌 買いプット候補（保険ロジック）\\n" +
         "安全（Wide: 最悪の下落に備える）: " + data.long_safe + "\\n" +
         "標準（Medium: 平均下落 ×2）: " + data.long_standard + "\\n" +
@@ -1448,15 +1435,11 @@ async function loadBullPutLongCandidates(){
 
 async function loadBearCallLongCandidates(){
     const K_short = Number(document.getElementById("bc_K_short").value);
-
-    const data = await fetch(`/api/bear_call_long_candidates?K_short=${K_short}`)
-        .then(r => r.json());
-
+    const data = await fetch("/api/bear_call_long_candidates?K_short=" + K_short).then(r => r.json());
     document.getElementById("bearCallLongCandidates").textContent =
         "📌 売りコール（ショート）: " + data.short_strike + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n" +
         "📌 最大上昇率（3年・月末）: " + (data.max_rise_rate * 100).toFixed(2) + "%\\n\\n" +
-
         "📌 買いコール候補（保険ロジック）\\n" +
         "安全（Wide: 最悪の上昇に備える）: " + data.long_safe + "\\n" +
         "標準（Medium: 平均上昇 ×2）: " + data.long_standard + "\\n" +
@@ -1465,62 +1448,40 @@ async function loadBearCallLongCandidates(){
 
 async function calcBullPutLongPremium(){
     const K_long = Number(document.getElementById("bp_K_long").value);
-    const T = 0.1;  // 残存期間（年換算）
-
-    const data = await fetch(`/api/bull_put_long_premium?K_long=${K_long}&T=${T}`)
-        .then(r => r.json());
-
-    if(data.error){
-        alert("エラー: " + data.error);
-        return;
-    }
-
-    // 買いプットのプレミアム欄に自動入力
+    const T = 0.1;
+    const data = await fetch("/api/bull_put_long_premium?K_long=" + K_long + "&T=" + T).then(r => r.json());
+    if(data.error){ alert("エラー: " + data.error); return; }
     document.getElementById("bp_premium_long").value = data.premium_theoretical;
 }
 
 async function calcBearCallLongPremium(){
     const K_long = Number(document.getElementById("bc_K_long").value);
     const T = 0.1;
-
-    const data = await fetch(`/api/bear_call_long_premium?K_long=${K_long}&T=${T}`)
-        .then(r => r.json());
-
-    if(data.error){
-        alert("エラー: " + data.error);
-        return;
-    }
-
-    // 買いコールのプレミアム欄に自動入力
+    const data = await fetch("/api/bear_call_long_premium?K_long=" + K_long + "&T=" + T).then(r => r.json());
+    if(data.error){ alert("エラー: " + data.error); return; }
     document.getElementById("bc_premium_long").value = data.premium_theoretical;
 }
 
 async function loadMarketInsights(){
     const info = await fetch("/api/market_insights").then(r=>r.json());
-
-    document.getElementById("insightsBox").innerHTML = `
-        <b>📌 株価 S:</b> ${info.S}<br>
-        <b>📌 ボラティリティ σ:</b> ${info.sigma.toFixed(4)}<br><br>
-
-        <b>【過去1年の傾向】</b><br>
-        平均上昇率: ${(info.avg_rise * 100).toFixed(2)}%<br>
-        平均下落率: ${(info.avg_drop * 100).toFixed(2)}%<br>
-        最大上昇率: ${(info.max_rise * 100).toFixed(2)}%<br>
-        最大下落率: ${(info.max_drop * 100).toFixed(2)}%<br><br>
-
-        <b>【勝率（簡易バックテスト）】</b><br>
-        ブルプット勝率: ${(info.bull_put_win_rate * 100).toFixed(1)}%<br>
-        ベアコール勝率: ${(info.bear_call_win_rate * 100).toFixed(1)}%<br><br>
-
-        <b>【現在の位置】</b><br>
-        過去1年レンジ: ${info.range_low} ～ ${info.range_high}<br>
-        現在値の位置: ${(info.position_percent * 100).toFixed(1)}%<br><br>
-
-        <b>【戦略ヒント】</b><br>
-        ${info.hint_text}
-    `;
+    document.getElementById("insightsBox").innerHTML =
+        "<b>📌 株価 S:</b> " + info.S + "<br>" +
+        "<b>📌 ボラティリティ σ:</b> " + info.sigma.toFixed(4) + "<br><br>" +
+        "<b>【過去1年の傾向】</b><br>" +
+        "平均上昇率: " + (info.avg_rise * 100).toFixed(2) + "%<br>" +
+        "平均下落率: " + (info.avg_drop * 100).toFixed(2) + "%<br>" +
+        "最大上昇率: " + (info.max_rise * 100).toFixed(2) + "%<br>" +
+        "最大下落率: " + (info.max_drop * 100).toFixed(2) + "%<br><br>" +
+        "<b>【勝率（簡易バックテスト）】</b><br>" +
+        "ブルプット勝率: " + (info.bull_put_win_rate * 100).toFixed(1) + "%<br>" +
+        "ベアコール勝率: " + (info.bear_call_win_rate * 100).toFixed(1) + "%<br><br>" +
+        "<b>【現在の位置】</b><br>" +
+        "過去1年レンジ: " + info.range_low + " ～ " + info.range_high + "<br>" +
+        "現在値の位置: " + (info.position_percent * 100).toFixed(1) + "%<br><br>" +
+        "<b>【戦略ヒント】</b><br>" + info.hint_text;
 }
 
+/* ロールアウト / ロールダウン（テンプレートリテラルを使わない） */
 async function loadRolloutCandidates(){
     const payload = {
         S: Number(document.getElementById("ro_S").value),
@@ -1530,22 +1491,20 @@ async function loadRolloutCandidates(){
         iv: Number(document.getElementById("ro_iv").value || 0.20),
         market_bias: Number(document.getElementById("ro_bias").value || 0)
     };
-
     const data = await fetch("/api/rollout_candidates", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload)
     }).then(r => r.json());
 
-    let txt = "📌 ロールアウト候補一覧\n\n";
-    data.candidates.forEach(c => {
-        txt += "shift: " + c.shift + "\n";
-        txt += "new_short_put: " + c.new_short_put + "\n";
-        txt += "new_long_put: " + c.new_long_put + "\n";
-        txt += "estimated_credit: " + c.estimated_credit + "\n";
-        txt += "distance_from_S: " + c.distance_from_S + "\n\n";
+    let txt = "📌 ロールアウト候補一覧\\n\\n";
+    data.candidates.forEach(function(c){
+        txt += "shift: " + c.shift + "\\n";
+        txt += "new_short_put: " + c.new_short_put + "\\n";
+        txt += "new_long_put: " + c.new_long_put + "\\n";
+        txt += "estimated_credit: " + c.estimated_credit + "\\n";
+        txt += "distance_from_S: " + c.distance_from_S + "\\n\\n";
     });
-
     document.getElementById("rolloutCandidates").textContent = txt;
 }
 
@@ -1558,7 +1517,6 @@ async function calcRolloutPNL(){
         iv: Number(document.getElementById("ro_iv").value || 0.20),
         market_bias: Number(document.getElementById("ro_bias").value || 0)
     };
-
     const data = await fetch("/api/rollout_pnl", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -1583,22 +1541,20 @@ async function loadRolldownCandidates(){
         iv: Number(document.getElementById("rd_iv").value || 0.20),
         market_bias: Number(document.getElementById("rd_bias").value || 0)
     };
-
     const data = await fetch("/api/rolldown_candidates", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload)
     }).then(r => r.json());
 
-    let txt = "📌 ロールダウン候補一覧\n\n";
-    data.candidates.forEach(c => {
-        txt += "shift: " + c.shift + "\n";
-        txt += "new_short_put: " + c.new_short_put + "\n";
-        txt += "new_long_put: " + c.new_long_put + "\n";
-        txt += "estimated_credit: " + c.estimated_credit + "\n";
-        txt += "distance_from_S: " + c.distance_from_S + "\n\n";
+    let txt = "📌 ロールダウン候補一覧\\n\\n";
+    data.candidates.forEach(function(c){
+        txt += "shift: " + c.shift + "\\n";
+        txt += "new_short_put: " + c.new_short_put + "\\n";
+        txt += "new_long_put: " + c.new_long_put + "\\n";
+        txt += "estimated_credit: " + c.estimated_credit + "\\n";
+        txt += "distance_from_S: " + c.distance_from_S + "\\n\\n";
     });
-    
     document.getElementById("rolldownCandidates").textContent = txt;
 }
 
@@ -1611,7 +1567,6 @@ async function calcRolldownPNL(){
         iv: Number(document.getElementById("rd_iv").value || 0.20),
         market_bias: Number(document.getElementById("rd_bias").value || 0)
     };
-
     const data = await fetch("/api/rolldown_pnl", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -1626,7 +1581,6 @@ async function calcRolldownPNL(){
         "IV効果: " + data.iv_effect + "%\\n" +
         "市場コメント: " + data.bias_comment;
 }
-
 </script>
 
 </body>
