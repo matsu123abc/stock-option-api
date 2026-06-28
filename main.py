@@ -817,6 +817,238 @@ def market_insights():
         }
     }
 
+@app.post("/api/rollout_candidates")
+def rollout_candidates(data: dict):
+    """
+    ロールアウト候補を返すAPI（IV・市場データを含む一般化版）
+    - ストライクを 300 / 500 / 700 円下げた候補を返す
+    - IV が高いほどクレジットが増えやすい
+    - 市場が弱いほどストライクを下げる候補が有利
+    """
+
+    S = data["S"]
+    short_put = data["short_put"]
+    long_put = data["long_put"]
+    credit = data["credit"]
+    iv = data.get("iv", 0.20)              # 初心者向けにデフォルト 20%
+    market_bias = data.get("market_bias", 0)  # -1 弱気 / 0 中立 / +1 強気
+
+    # 初心者向けの一般的な調整幅
+    shifts = [300, 500, 700]
+
+    candidates = []
+
+    for shift in shifts:
+        new_short_put = short_put - shift
+        new_long_put = long_put - shift
+
+        # IV が高いほどクレジットが増えやすい（一般的傾向）
+        iv_factor = 1 + iv
+
+        # 市場が弱いほどストライクを下げる候補が有利（一般的傾向）
+        bias_factor = 1 + (market_bias * 0.1)
+
+        # クレジットの推定（初心者向けの簡易モデル）
+        estimated_credit = int(credit * iv_factor * bias_factor)
+
+        candidates.append({
+            "shift": shift,
+            "new_short_put": new_short_put,
+            "new_long_put": new_long_put,
+            "estimated_credit": estimated_credit,
+            "distance_from_S": S - new_short_put,
+            "iv": iv,
+            "market_bias": market_bias
+        })
+
+    return {
+        "S": S,
+        "short_put": short_put,
+        "long_put": long_put,
+        "credit": credit,
+        "iv": iv,
+        "market_bias": market_bias,
+        "candidates": candidates
+    }
+
+@app.post("/api/rollout_pnl")
+def rollout_pnl(data: dict):
+    """
+    ロールアウト損益計算API（初心者向け一般化版）
+    - 最大利益、最大損失、ブレークイーブンを計算
+    - IV と市場バイアスを補助的に反映
+    """
+
+    S = data["S"]
+    new_short_put = data["new_short_put"]
+    new_long_put = data["new_long_put"]
+    new_credit = data["new_credit"]
+
+    iv = data.get("iv", 0.20)              # 初心者向けデフォルト 20%
+    market_bias = data.get("market_bias", 0)  # -1 弱気 / 0 中立 / +1 強気
+
+    # スプレッド幅
+    width = new_short_put - new_long_put
+
+    # 最大利益（受け取るクレジット）
+    max_profit = new_credit
+
+    # 最大損失（幅 − クレジット）
+    max_loss = width - new_credit
+
+    # ブレークイーブン（損益分岐点）
+    breakeven = new_short_put - new_credit
+
+    # 安全度（株価からの距離）
+    safety_distance = S - new_short_put
+
+    # IV が高いほど損益の振れ幅が大きくなる（一般的傾向）
+    iv_effect = iv * 100  # 表示用の簡易指標
+
+    # 市場バイアス（弱気なら安全性を重視）
+    bias_comment = (
+        "市場は弱気なので、ストライクを下げたロールアウトが有利です。"
+        if market_bias < 0 else
+        "市場は強気なので、ストライクをあまり下げないロールアウトが有利です。"
+        if market_bias > 0 else
+        "市場は中立です。一般的なロールアウトが適しています。"
+    )
+
+    return {
+        "new_short_put": new_short_put,
+        "new_long_put": new_long_put,
+        "new_credit": new_credit,
+
+        "max_profit": max_profit,
+        "max_loss": -max_loss,  # 損失はマイナス表示
+        "breakeven": breakeven,
+
+        "safety_distance": safety_distance,
+        "iv_effect": iv_effect,
+        "market_bias": market_bias,
+        "bias_comment": bias_comment,
+
+        "comment": "ロールアウト後の損益構造を計算しました。"
+    }
+
+@app.post("/api/rolldown_candidates")
+def rolldown_candidates(data: dict):
+    """
+    ロールダウン候補を返すAPI（IV・市場データを含む一般化版）
+    - ストライクを 300 / 500 / 700 円下げた候補を返す
+    - ロールダウンは安全性を上げるため、クレジットは減りやすい
+    - IV が高いほどクレジット減少が小さくなる（一般的傾向）
+    - 市場が弱いほどストライクを下げる候補が有利
+    """
+
+    S = data["S"]
+    short_put = data["short_put"]
+    long_put = data["long_put"]
+    credit = data["credit"]
+
+    iv = data.get("iv", 0.20)              # 初心者向けデフォルト 20%
+    market_bias = data.get("market_bias", 0)  # -1 弱気 / 0 中立 / +1 強気
+
+    # 初心者向けの一般的な調整幅
+    shifts = [300, 500, 700]
+
+    candidates = []
+
+    for shift in shifts:
+        new_short_put = short_put - shift
+        new_long_put = long_put - shift
+
+        # ロールダウンは安全性アップ → クレジットは減りやすい
+        # IV が高いほどクレジット減少が小さくなる（一般的傾向）
+        iv_factor = 1 - (iv * 0.3)  # IV 20% → 0.94 くらいの軽減
+
+        # 市場が弱いほどストライクを下げる候補が有利
+        bias_factor = 1 + (market_bias * 0.1)
+
+        # クレジット推定（初心者向け簡易モデル）
+        estimated_credit = int(credit * iv_factor * bias_factor)
+
+        candidates.append({
+            "shift": shift,
+            "new_short_put": new_short_put,
+            "new_long_put": new_long_put,
+            "estimated_credit": estimated_credit,
+            "distance_from_S": S - new_short_put,
+            "iv": iv,
+            "market_bias": market_bias
+        })
+
+    return {
+        "S": S,
+        "short_put": short_put,
+        "long_put": long_put,
+        "credit": credit,
+        "iv": iv,
+        "market_bias": market_bias,
+        "candidates": candidates
+    }
+
+@app.post("/api/rolldown_pnl")
+def rolldown_pnl(data: dict):
+    """
+    ロールダウン損益計算API（初心者向け一般化版）
+    - 最大利益、最大損失、ブレークイーブンを計算
+    - IV と市場バイアスを補助的に反映
+    """
+
+    S = data["S"]
+    new_short_put = data["new_short_put"]
+    new_long_put = data["new_long_put"]
+    new_credit = data["new_credit"]
+
+    iv = data.get("iv", 0.20)              # 初心者向けデフォルト 20%
+    market_bias = data.get("market_bias", 0)  # -1 弱気 / 0 中立 / +1 強気
+
+    # スプレッド幅
+    width = new_short_put - new_long_put
+
+    # 最大利益（受け取るクレジット）
+    max_profit = new_credit
+
+    # 最大損失（幅 − クレジット）
+    max_loss = width - new_credit
+
+    # ブレークイーブン（損益分岐点）
+    breakeven = new_short_put - new_credit
+
+    # 安全度（株価からの距離）
+    safety_distance = S - new_short_put
+
+    # IV が高いほど損益の振れ幅が大きくなる（一般的傾向）
+    iv_effect = iv * 100  # 表示用の簡易指標
+
+    # 市場バイアス（弱気なら安全性を重視）
+    bias_comment = (
+        "市場は弱気なので、ストライクを下げたロールダウンが有利です。"
+        if market_bias < 0 else
+        "市場は強気なので、ストライクをあまり下げないロールダウンが有利です。"
+        if market_bias > 0 else
+        "市場は中立です。一般的なロールダウンが適しています。"
+    )
+
+    return {
+        "new_short_put": new_short_put,
+        "new_long_put": new_long_put,
+        "new_credit": new_credit,
+
+        "max_profit": max_profit,
+        "max_loss": -max_loss,  # 損失はマイナス表示
+        "breakeven": breakeven,
+
+        "safety_distance": safety_distance,
+        "iv_effect": iv_effect,
+        "market_bias": market_bias,
+        "bias_comment": bias_comment,
+
+        "comment": "ロールダウン後の損益構造を計算しました。"
+    }
+
+
 
 # -----------------------------
 # ⑧ UI（スマホ最適化 + ブルプット/ベアコール）
@@ -902,6 +1134,8 @@ def index():
     <option value="basic">基本情報（株価・ボラティリティ）</option>
     <option value="bull_put">ブル・プット・クレジットスプレッド</option>
     <option value="bear_call">ベア・コール・クレジットスプレッド</option>
+    <option value="rollout">ロールアウト（期限延長）</option>
+    <option value="rolldown">ロールダウン（ストライク調整）</option>
 </select>
 
 <div id="infoBox"></div>
@@ -958,7 +1192,6 @@ def index():
     <pre id="bullPutLongCandidates"></pre>
 
     <button onclick="calcBullPutLongPremium()">買いプットプレミアムを自動計算</button>
-    
 </div>
 
 <!-- ★ ベアコール UI ★ -->
@@ -999,8 +1232,65 @@ def index():
     <pre id="bearCallLongCandidates"></pre>
 
     <button onclick="calcBearCallLongPremium()">買いコールプレミアムを自動計算</button>
-
     </div>
+
+<!-- ★ ロールアウト UI ★ -->
+<div id="rolloutBox" style="display:none;">
+    <h3>ロールアウト（期限延長）</h3>
+
+    株価 S:<br>
+    <input id="ro_S" type="number">
+
+    売りプットのストライク（K_short）:<br>
+    <input id="ro_K_short" type="number">
+
+    買いプットのストライク（K_long）:<br>
+    <input id="ro_K_long" type="number">
+
+    現在の受取クレジット:<br>
+    <input id="ro_credit" type="number">
+
+    IV（任意）:<br>
+    <input id="ro_iv" type="number" placeholder="例: 0.20">
+
+    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br>
+    <input id="ro_bias" type="number" placeholder="例: -1">
+
+    <button onclick="loadRolloutCandidates()">ロールアウト候補を表示</button>
+    <pre id="rolloutCandidates"></pre>
+
+    <button onclick="calcRolloutPNL()">ロールアウト損益計算</button>
+    <pre id="rolloutPNL"></pre>
+</div>
+
+<!-- ★ ロールダウン UI ★ -->
+<div id="rolldownBox" style="display:none;">
+    <h3>ロールダウン（ストライク調整）</h3>
+
+    株価 S:<br>
+    <input id="rd_S" type="number">
+
+    売りプットのストライク（K_short）:<br>
+    <input id="rd_K_short" type="number">
+
+    買いプットのストライク（K_long）:<br>
+    <input id="rd_K_long" type="number">
+
+    現在の受取クレジット:<br>
+    <input id="rd_credit" type="number">
+
+    IV（任意）:<br>
+    <input id="rd_iv" type="number" placeholder="例: 0.20">
+
+    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br>
+    <input id="rd_bias" type="number" placeholder="例: -1">
+
+    <button onclick="loadRolldownCandidates()">ロールダウン候補を表示</button>
+    <pre id="rolldownCandidates"></pre>
+
+    <button onclick="calcRolldownPNL()">ロールダウン損益計算</button>
+    <pre id="rolldownPNL"></pre>
+</div>
 
 <hr>
 
@@ -1023,6 +1313,14 @@ async function onMenuChange(){
     }
     if(menu === "bear_call"){
         document.getElementById("bearCallBox").style.display = "block";
+        return;
+    }
+    if(menu === "rollout"){
+        document.getElementById("rolloutBox").style.display = "block";
+        return;
+    }
+    if(menu === "rolldown"){
+        document.getElementById("rolldownBox").style.display = "block";
         return;
     }
 }
@@ -1221,6 +1519,112 @@ async function loadMarketInsights(){
         <b>【戦略ヒント】</b><br>
         ${info.hint_text}
     `;
+}
+
+async function loadRolloutCandidates(){
+    const payload = {
+        S: Number(document.getElementById("ro_S").value),
+        short_put: Number(document.getElementById("ro_K_short").value),
+        long_put: Number(document.getElementById("ro_K_long").value),
+        credit: Number(document.getElementById("ro_credit").value),
+        iv: Number(document.getElementById("ro_iv").value || 0.20),
+        market_bias: Number(document.getElementById("ro_bias").value || 0)
+    };
+
+    const data = await fetch("/api/rollout_candidates", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+
+    let txt = "📌 ロールアウト候補一覧\n\n";
+    data.candidates.forEach(c => {
+        txt += `shift: ${c.shift}\n`;
+        txt += `new_short_put: ${c.new_short_put}\n`;
+        txt += `new_long_put: ${c.new_long_put}\n`;
+        txt += `estimated_credit: ${c.estimated_credit}\n`;
+        txt += `distance_from_S: ${c.distance_from_S}\n\n`;
+    });
+
+    document.getElementById("rolloutCandidates").textContent = txt;
+}
+
+async function calcRolloutPNL(){
+    const payload = {
+        S: Number(document.getElementById("ro_S").value),
+        new_short_put: Number(document.getElementById("ro_K_short").value),
+        new_long_put: Number(document.getElementById("ro_K_long").value),
+        new_credit: Number(document.getElementById("ro_credit").value),
+        iv: Number(document.getElementById("ro_iv").value || 0.20),
+        market_bias: Number(document.getElementById("ro_bias").value || 0)
+    };
+
+    const data = await fetch("/api/rollout_pnl", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+
+    document.getElementById("rolloutPNL").textContent =
+        "最大利益: " + data.max_profit + "\\n" +
+        "最大損失: " + data.max_loss + "\\n" +
+        "ブレークイーブン: " + data.breakeven + "\\n" +
+        "安全度: " + data.safety_distance + "\\n" +
+        "IV効果: " + data.iv_effect + "%\\n" +
+        "市場コメント: " + data.bias_comment;
+}
+
+async function loadRolldownCandidates(){
+    const payload = {
+        S: Number(document.getElementById("rd_S").value),
+        short_put: Number(document.getElementById("rd_K_short").value),
+        long_put: Number(document.getElementById("rd_K_long").value),
+        credit: Number(document.getElementById("rd_credit").value),
+        iv: Number(document.getElementById("rd_iv").value || 0.20),
+        market_bias: Number(document.getElementById("rd_bias").value || 0)
+    };
+
+    const data = await fetch("/api/rolldown_candidates", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+
+    let txt = "📌 ロールダウン候補一覧\n\n";
+    data.candidates.forEach(c => {
+        txt += `shift: ${c.shift}\n`;
+        txt += `new_short_put: ${c.new_short_put}\n`;
+        txt += `new_long_put: ${c.new_long_put}\n`;
+        txt += `estimated_credit: ${c.estimated_credit}\n`;
+        txt += `distance_from_S: ${c.distance_from_S}\n\n`;
+    });
+
+    document.getElementById("rolldownCandidates").textContent = txt;
+}
+
+async function calcRolldownPNL(){
+    const payload = {
+        S: Number(document.getElementById("rd_S").value),
+        new_short_put: Number(document.getElementById("rd_K_short").value),
+        new_long_put: Number(document.getElementById("rd_K_long").value),
+        new_credit: Number(document.getElementById("rd_credit").value),
+        iv: Number(document.getElementById("rd_iv").value || 0.20),
+        market_bias: Number(document.getElementById("rd_bias").value || 0)
+    };
+
+    const data = await fetch("/api/rolldown_pnl", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+
+    document.getElementById("rolldownPNL").textContent =
+        "最大利益: " + data.max_profit + "\\n" +
+        "最大損失: " + data.max_loss + "\\n" +
+        "ブレークイーブン: " + data.breakeven + "\\n" +
+        "安全度: " + data.safety_distance + "\\n" +
+        "IV効果: " + data.iv_effect + "%\\n" +
+        "市場コメント: " + data.bias_comment;
 }
 
 </script>
