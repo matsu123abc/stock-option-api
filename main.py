@@ -1539,11 +1539,11 @@ async function loadRolloutCandidates(){
 
     let txt = "📌 ロールアウト候補一覧\n\n";
     data.candidates.forEach(c => {
-        txt += `shift: ${c.shift}\n`;
-        txt += `new_short_put: ${c.new_short_put}\n`;
-        txt += `new_long_put: ${c.new_long_put}\n`;
-        txt += `estimated_credit: ${c.estimated_credit}\n`;
-        txt += `distance_from_S: ${c.distance_from_S}\n\n`;
+        txt += "shift: " + c.shift + "\n";
+        txt += "new_short_put: " + c.new_short_put + "\n";
+        txt += "new_long_put: " + c.new_long_put + "\n";
+        txt += "estimated_credit: " + c.estimated_credit + "\n";
+        txt += "distance_from_S: " + c.distance_from_S + "\n\n";
     });
 
     document.getElementById("rolloutCandidates").textContent = txt;
@@ -1592,13 +1592,13 @@ async function loadRolldownCandidates(){
 
     let txt = "📌 ロールダウン候補一覧\n\n";
     data.candidates.forEach(c => {
-        txt += `shift: ${c.shift}\n`;
-        txt += `new_short_put: ${c.new_short_put}\n`;
-        txt += `new_long_put: ${c.new_long_put}\n`;
-        txt += `estimated_credit: ${c.estimated_credit}\n`;
-        txt += `distance_from_S: ${c.distance_from_S}\n\n`;
+        txt += "shift: " + c.shift + "\n";
+        txt += "new_short_put: " + c.new_short_put + "\n";
+        txt += "new_long_put: " + c.new_long_put + "\n";
+        txt += "estimated_credit: " + c.estimated_credit + "\n";
+        txt += "distance_from_S: " + c.distance_from_S + "\n\n";
     });
-
+    
     document.getElementById("rolldownCandidates").textContent = txt;
 }
 
