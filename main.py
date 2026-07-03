@@ -1048,6 +1048,111 @@ def rolldown_pnl(data: dict):
         "comment": "ロールダウン後の損益構造を計算しました。"
     }
 
+@app.get("/api/bs_put")
+def bs_put(S: float, K: float, T: float, r: float, sigma: float):
+    try:
+        d1 = (log(S / K) + (r + sigma**2 / 2) * T) / (sigma * sqrt(T))
+        d2 = d1 - sigma * sqrt(T)
+
+        price = K * exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+        delta = norm.cdf(d1) - 1
+        gamma = norm.pdf(d1) / (S * sigma * sqrt(T))
+        theta = -(S * norm.pdf(d1) * sigma) / (2 * sqrt(T)) \
+                + r * K * exp(-r * T) * norm.cdf(-d2)
+        vega = S * norm.pdf(d1) * sqrt(T)
+        rho = -K * T * exp(-r * T) * norm.cdf(-d2)
+
+        return {
+            "price": price,
+            "delta": delta,
+            "gamma": gamma,
+            "theta": theta,
+            "vega": vega,
+            "rho": rho
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get("/api/greeks")
+def greeks(S: float, K: float, T: float, r: float, sigma: float, option_type: str):
+    try:
+        d1 = (log(S / K) + (r + sigma**2 / 2) * T) / (sigma * sqrt(T))
+        d2 = d1 - sigma * sqrt(T)
+
+        if option_type == "call":
+            delta = norm.cdf(d1)
+            rho = K * T * exp(-r * T) * norm.cdf(d2)
+        else:
+            delta = norm.cdf(d1) - 1
+            rho = -K * T * exp(-r * T) * norm.cdf(-d2)
+
+        gamma = norm.pdf(d1) / (S * sigma * sqrt(T))
+        theta = -(S * norm.pdf(d1) * sigma) / (2 * sqrt(T)) \
+                - r * K * exp(-r * T) * (norm.cdf(d2) if option_type == "call" else -norm.cdf(-d2))
+        vega = S * norm.pdf(d1) * sqrt(T)
+
+        return {
+            "delta": delta,
+            "gamma": gamma,
+            "theta": theta,
+            "vega": vega,
+            "rho": rho
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/next_step_buy")
+def next_step_buy(data: dict):
+    S = data["S"]
+    K = data["K"]
+    T = data["T"]
+    sigma = data["sigma"]
+    premium_paid = data["premium_paid"]
+    price_now = data["price_now"]
+    option_type = data["option_type"]  # "call" or "put"
+    delta = data.get("delta", None)
+    theta = data.get("theta", None)
+
+    profit_pct = (price_now - premium_paid) / premium_paid * 100
+
+    # ① 利確ゾーン
+    if profit_pct >= 30 and T > 0.03 and (delta is None or delta >= 0.5):
+        return {
+            "action": "部分利確（50%）＋残りホールド",
+            "reason": f"含み益 {profit_pct:.1f}%・残存日数も十分・デルタが高く方向性が合っています。",
+            "params": "売却割合 50%",
+            "effect": "利益を確保しつつ、さらに伸ばす余地を残します。",
+            "caution": "急なIV低下や反転には注意してください。"
+        }
+
+    # ② 時間切れ警戒ゾーン
+    if T <= 0.02 and theta is not None and theta < 0:
+        return {
+            "action": "決済検討（利確 or 損切り）",
+            "reason": "残存日数が少なく、時間価値の減少が大きくなっています。",
+            "params": "全決済を検討",
+            "effect": "時間価値の減少によるダメージを避けられます。",
+            "caution": "方向が合っていても、伸ばせる時間がほとんど残っていません。"
+        }
+
+    # ③ 損切りゾーン
+    if profit_pct <= -60 and sigma > 0.25:
+        return {
+            "action": "損切り or スプレッド化",
+            "reason": f"含み損 {profit_pct:.1f}%・ボラティリティが高くプレミアムが膨らみやすい環境です。",
+            "params": "損切り or 売りオプション追加でスプレッド化",
+            "effect": "損失拡大を防ぎ、最大損失を限定できます。",
+            "caution": "スプレッド化は証拠金やリスク構造を理解した上で行ってください。"
+        }
+
+    # ④ デフォルト：ホールド
+    return {
+        "action": "ホールド（保有）",
+        "reason": "含み益・含み損が許容範囲内で、時間もまだ残っています。",
+        "params": "そのまま保有",
+        "effect": "方向性が合えば利益が伸びます。",
+        "caution": "Theta による時間価値減少と、IV変動には注意してください。"
+    }
 
 
 # -----------------------------
@@ -1132,6 +1237,8 @@ def index():
 <select id="menu" onchange="onMenuChange()">
     <option value="">選択してください</option>
     <option value="basic">基本情報（株価・ボラティリティ）</option>
+    <option value="call_buy">コール買い（Call Buy）</option>
+    <option value="put_buy">プット買い（Put Buy）</option>
     <option value="bull_put">ブル・プット・クレジットスプレッド</option>
     <option value="bear_call">ベア・コール・クレジットスプレッド</option>
     <option value="rollout">ロールアウト（期限延長）</option>
@@ -1147,6 +1254,70 @@ def index():
     <button onclick="loadMarketInsights()">最新情報を取得</button>
 
     <div id="insightsBox" style="
+        background:#f2f2f2;
+        padding:16px;
+        border-radius:10px;
+        margin-top:16px;
+        font-size:22px;
+    "></div>
+</div>
+
+<!-- ★ コール買い UI ★ -->
+<div id="callBuyBox" style="display:none;">
+    <h3>コール買い（Call Buy）</h3>
+
+    株価 S:<br>
+    <input id="cb_S" type="number">
+
+    ストライク K:<br>
+    <input id="cb_K" type="number">
+
+    残存期間 T（年換算）:<br>
+    <input id="cb_T" type="number" placeholder="例: 0.1">
+
+    ボラティリティ σ:<br>
+    <input id="cb_sigma" type="number" placeholder="例: 0.20">
+
+    支払プレミアム（任意）:<br>
+    <input id="cb_premium" type="number" placeholder="例: 200">
+
+    <button onclick="calcCallBuy()">コール買いを計算</button>
+    <pre id="callBuyResult"></pre>
+
+    <!-- 次の一手カード -->
+    <div id="callBuyNextStep" style="
+        background:#f2f2f2;
+        padding:16px;
+        border-radius:10px;
+        margin-top:16px;
+        font-size:22px;
+    "></div>
+</div>
+
+<!-- ★ プット買い UI ★ -->
+<div id="putBuyBox" style="display:none;">
+    <h3>プット買い（Put Buy）</h3>
+
+    株価 S:<br>
+    <input id="pb_S" type="number">
+
+    ストライク K:<br>
+    <input id="pb_K" type="number">
+
+    残存期間 T（年換算）:<br>
+    <input id="pb_T" type="number" placeholder="例: 0.1">
+
+    ボラティリティ σ:<br>
+    <input id="pb_sigma" type="number" placeholder="例: 0.20">
+
+    支払プレミアム（任意）:<br>
+    <input id="pb_premium" type="number" placeholder="例: 200">
+
+    <button onclick="calcPutBuy()">プット買いを計算</button>
+    <pre id="putBuyResult"></pre>
+
+    <!-- 次の一手カード -->
+    <div id="putBuyNextStep" style="
         background:#f2f2f2;
         padding:16px;
         border-radius:10px;
@@ -1302,6 +1473,8 @@ async function onMenuChange(){
 
     // すべて非表示（必ずここに追加したボックスを含める）
     document.getElementById("insightsSection").style.display = "none";
+    document.getElementById("callBuyBox").style.display = "none";
+    document.getElementById("putBuyBox").style.display = "none";
     document.getElementById("bullPutBox").style.display = "none";
     document.getElementById("bearCallBox").style.display = "none";
     document.getElementById("rolloutBox").style.display = "none";
@@ -1309,6 +1482,14 @@ async function onMenuChange(){
 
     if(menu === "basic"){
         document.getElementById("insightsSection").style.display = "block";
+        return;
+    }
+    if(menu === "call_buy"){
+    document.getElementById("callBuyBox").style.display = "block";
+    return;
+    }
+    if(menu === "put_buy"){
+        document.getElementById("putBuyBox").style.display = "block";
         return;
     }
     if(menu === "bull_put"){
@@ -1328,6 +1509,118 @@ async function onMenuChange(){
         return;
     }
 }
+
+async function calcCallBuy(){
+    const S = Number(document.getElementById("cb_S").value);
+    const K = Number(document.getElementById("cb_K").value);
+    const T = Number(document.getElementById("cb_T").value);
+    const sigma = Number(document.getElementById("cb_sigma").value);
+    const premium = Number(document.getElementById("cb_premium").value);
+
+    const bs = await fetch("/api/bs_call?S=" + S + "&K=" + K + "&T=" + T + "&r=0.001&sigma=" + sigma).then(r=>r.json());
+    const gk = await fetch("/api/greeks?S=" + S + "&K=" + K + "&T=" + T + "&r=0.001&sigma=" + sigma + "&option_type=call").then(r=>r.json());
+
+    const paid = premium || bs.price;
+    const profit_now = bs.price - paid;
+
+    document.getElementById("callBuyResult").textContent =
+        "理論価格: " + bs.price + "\n" +
+        "Delta: " + gk.delta + "\n" +
+        "Gamma: " + gk.gamma + "\n" +
+        "Theta: " + gk.theta + "\n" +
+        "Vega: " + gk.vega + "\n" +
+        "Rho: " + gk.rho + "\n\n" +
+        "支払プレミアム: " + paid + "\n" +
+        "現在の即時損益: " + profit_now + "\n" +
+        "最大損失: " + paid;
+
+    // 次の一手（高度化ロジック）呼び出し
+    await loadCallBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
+}
+
+async function loadCallBuyNextStep(S, K, T, sigma, premium, price_now, delta, theta){
+    const payload = {
+        S: S,
+        K: K,
+        T: T,
+        sigma: sigma,
+        premium_paid: premium,
+        price_now: price_now,
+        option_type: "call",
+        delta: delta,
+        theta: theta
+    };
+
+    const data = await fetch("/api/next_step_buy", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+    }).then(r=>r.json());
+
+    document.getElementById("callBuyNextStep").textContent =
+        "📘 次の一手\n\n" +
+        "推奨アクション: " + data.action + "\n" +
+        "理由: " + data.reason + "\n" +
+        "推奨パラメータ: " + data.params + "\n" +
+        "期待効果: " + data.effect + "\n" +
+        "注意点: " + data.caution;
+}
+
+async function calcPutBuy(){
+    const S = Number(document.getElementById("pb_S").value);
+    const K = Number(document.getElementById("pb_K").value);
+    const T = Number(document.getElementById("pb_T").value);
+    const sigma = Number(document.getElementById("pb_sigma").value);
+    const premium = Number(document.getElementById("pb_premium").value);
+
+    const bs = await fetch("/api/bs_put?S=" + S + "&K=" + K + "&T=" + T + "&r=0.001&sigma=" + sigma).then(r=>r.json());
+    const gk = await fetch("/api/greeks?S=" + S + "&K=" + K + "&T=" + T + "&r=0.001&sigma=" + sigma + "&option_type=put").then(r=>r.json());
+
+    const paid = premium || bs.price;
+    const profit_now = bs.price - paid;
+
+    document.getElementById("putBuyResult").textContent =
+        "理論価格: " + bs.price + "\n" +
+        "Delta: " + gk.delta + "\n" +
+        "Gamma: " + gk.gamma + "\n" +
+        "Theta: " + gk.theta + "\n" +
+        "Vega: " + gk.vega + "\n" +
+        "Rho: " + gk.rho + "\n\n" +
+        "支払プレミアム: " + paid + "\n" +
+        "現在の即時損益: " + profit_now + "\n" +
+        "最大損失: " + paid;
+
+    await loadPutBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
+}
+
+async function loadPutBuyNextStep(S, K, T, sigma, premium, price_now, delta, theta){
+    const payload = {
+        S: S,
+        K: K,
+        T: T,
+        sigma: sigma,
+        premium_paid: premium,
+        price_now: price_now,
+        option_type: "put",
+        delta: delta,
+        theta: theta
+    };
+
+    const data = await fetch("/api/next_step_buy", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+    }).then(r=>r.json());
+
+    document.getElementById("putBuyNextStep").textContent =
+        "📘 次の一手\n\n" +
+        "推奨アクション: " + data.action + "\n" +
+        "理由: " + data.reason + "\n" +
+        "推奨パラメータ: " + data.params + "\n" +
+        "期待効果: " + data.effect + "\n" +
+        "注意点: " + data.caution;
+}
+
 
 /* ブルプット / ベアコール 関数群（テンプレートリテラルを使わない） */
 async function loadBullPutStrikes(){
