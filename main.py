@@ -1339,6 +1339,9 @@ def index():
 </div>
 
 <script>
+/* JS 前半（Part 2 で後半を送ります） */
+
+/* メニュー切替 */
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
@@ -1380,6 +1383,7 @@ async function onMenuChange(){
     }
 }
 
+/* Call Buy */
 async function calcCallBuy(){
     const S = Number(document.getElementById("cb_S").value);
     const K = Number(document.getElementById("cb_K").value);
@@ -1394,14 +1398,14 @@ async function calcCallBuy(){
     const profit_now = bs.price - paid;
 
     document.getElementById("callBuyResult").textContent =
-        "理論価格: " + bs.price + "\n" +
-        "Delta: " + gk.delta + "\n" +
-        "Gamma: " + gk.gamma + "\n" +
-        "Theta: " + gk.theta + "\n" +
-        "Vega: " + gk.vega + "\n" +
-        "Rho: " + gk.rho + "\n\n" +
-        "支払プレミアム: " + paid + "\n" +
-        "現在の即時損益: " + profit_now + "\n" +
+        "理論価格: " + bs.price + "\\n" +
+        "Delta: " + gk.delta + "\\n" +
+        "Gamma: " + gk.gamma + "\\n" +
+        "Theta: " + gk.theta + "\\n" +
+        "Vega: " + gk.vega + "\\n" +
+        "Rho: " + gk.rho + "\\n\\n" +
+        "支払プレミアム: " + paid + "\\n" +
+        "現在の即時損益: " + profit_now + "\\n" +
         "最大損失: " + paid;
 
     await loadCallBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
@@ -1427,14 +1431,15 @@ async function loadCallBuyNextStep(S, K, T, sigma, premium, price_now, delta, th
     }).then(r=>r.json());
 
     document.getElementById("callBuyNextStep").textContent =
-        "📘 次の一手\n\n" +
-        "推奨アクション: " + data.action + "\n" +
-        "理由: " + data.reason + "\n" +
-        "推奨パラメータ: " + data.params + "\n" +
-        "期待効果: " + data.effect + "\n" +
+        "📘 次の一手\\n\\n" +
+        "推奨アクション: " + data.action + "\\n" +
+        "理由: " + data.reason + "\\n" +
+        "推奨パラメータ: " + data.params + "\\n" +
+        "期待効果: " + data.effect + "\\n" +
         "注意点: " + data.caution;
 }
 
+/* Put Buy */
 async function calcPutBuy(){
     const S = Number(document.getElementById("pb_S").value);
     const K = Number(document.getElementById("pb_K").value);
@@ -1449,14 +1454,14 @@ async function calcPutBuy(){
     const profit_now = bs.price - paid;
 
     document.getElementById("putBuyResult").textContent =
-        "理論価格: " + bs.price + "\n" +
-        "Delta: " + gk.delta + "\n" +
-        "Gamma: " + gk.gamma + "\n" +
-        "Theta: " + gk.theta + "\n" +
-        "Vega: " + gk.vega + "\n" +
-        "Rho: " + gk.rho + "\n\n" +
-        "支払プレミアム: " + paid + "\n" +
-        "現在の即時損益: " + profit_now + "\n" +
+        "理論価格: " + bs.price + "\\n" +
+        "Delta: " + gk.delta + "\\n" +
+        "Gamma: " + gk.gamma + "\\n" +
+        "Theta: " + gk.theta + "\\n" +
+        "Vega: " + gk.vega + "\\n" +
+        "Rho: " + gk.rho + "\\n\\n" +
+        "支払プレミアム: " + paid + "\\n" +
+        "現在の即時損益: " + profit_now + "\\n" +
         "最大損失: " + paid;
 
     await loadPutBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
@@ -1482,17 +1487,27 @@ async function loadPutBuyNextStep(S, K, T, sigma, premium, price_now, delta, the
     }).then(r=>r.json());
 
     document.getElementById("putBuyNextStep").textContent =
-        "📘 次の一手\n\n" +
-        "推奨アクション: " + data.action + "\n" +
-        "理由: " + data.reason + "\n" +
-        "推奨パラメータ: " + data.params + "\n" +
-        "期待効果: " + data.effect + "\n" +
+        "📘 次の一手\\n\\n" +
+        "推奨アクション: " + data.action + "\\n" +
+        "理由: " + data.reason + "\\n" +
+        "推奨パラメータ: " + data.params + "\\n" +
+        "期待効果: " + data.effect + "\\n" +
         "注意点: " + data.caution;
 }
 
+/* ブルプット / ベアコール */
 async function loadBullPutStrikes(){
     const data = await fetch("/api/bull_put_strikes").then(r=>r.json());
     document.getElementById("bullPutStrikes").textContent =
+        "📌 現在値 S: " + data.S + "\\n" +
+        "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n\\n" +
+        "📌 ストライク候補（ブルプット：下落率ベース）\\n" +
+        "安全（平均下落率）: " + data.strike_safe + "\\n" +
+        "超安全（1.5倍）: " + data.strike_super_safe + "\\n" +
+        "やや攻め（0.7倍）: " + data.strike_aggressive;
+
+/* JS 後半（Part 1 の続き） */
+
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n\\n" +
         "📌 ストライク候補（ブルプット：下落率ベース）\\n" +
