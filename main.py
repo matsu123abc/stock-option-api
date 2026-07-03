@@ -1211,14 +1211,6 @@ def index():
     border:none;
   }
 
-  #infoBox, #bullPutBox, #bearCallBox{
-    background:var(--panel);
-    padding:16px;
-    border-radius:10px;
-    font-size:24px;
-    margin-top:16px;
-  }
-
   pre{
     background:var(--panel);
     padding:16px;
@@ -1245,192 +1237,88 @@ def index():
     <option value="rolldown">ロールダウン（ストライク調整）</option>
 </select>
 
-<div id="infoBox"></div>
-
-<!-- 保存ボタン（ページ内の任意の位置に追加） -->
-<button id="btnSaveHtml" onclick="saveAsHtml()">現在の画面をHTMLで保存</button>
+<button onclick="saveAsHtml()">現在の画面をHTMLで保存</button>
 
 <div id="insightsSection" style="display:none;">
     <button onclick="loadMarketInsights()">最新情報を取得</button>
-
-    <div id="insightsBox" style="
-        background:#f2f2f2;
-        padding:16px;
-        border-radius:10px;
-        margin-top:16px;
-        font-size:22px;
-    "></div>
+    <div id="insightsBox" style="background:#f2f2f2;padding:16px;border-radius:10px;margin-top:16px;font-size:22px;"></div>
 </div>
 
 <!-- ★ コール買い UI ★ -->
 <div id="callBuyBox" style="display:none;">
     <h3>コール買い（Call Buy）</h3>
-
-    株価 S:<br>
-    <input id="cb_S" type="number">
-
-    ストライク K:<br>
-    <input id="cb_K" type="number">
-
-    残存期間 T（年換算）:<br>
-    <input id="cb_T" type="number" placeholder="例: 0.1">
-
-    ボラティリティ σ:<br>
-    <input id="cb_sigma" type="number" placeholder="例: 0.20">
-
-    支払プレミアム（任意）:<br>
-    <input id="cb_premium" type="number" placeholder="例: 200">
-
+    株価 S:<br><input id="cb_S" type="number">
+    ストライク K:<br><input id="cb_K" type="number">
+    残存期間 T（年換算）:<br><input id="cb_T" type="number" placeholder="例: 0.1">
+    ボラティリティ σ:<br><input id="cb_sigma" type="number" placeholder="例: 0.20">
+    支払プレミアム（任意）:<br><input id="cb_premium" type="number" placeholder="例: 200">
     <button onclick="calcCallBuy()">コール買いを計算</button>
     <pre id="callBuyResult"></pre>
-
-    <!-- 次の一手カード -->
-    <div id="callBuyNextStep" style="
-        background:#f2f2f2;
-        padding:16px;
-        border-radius:10px;
-        margin-top:16px;
-        font-size:22px;
-    "></div>
+    <div id="callBuyNextStep" style="background:#f2f2f2;padding:16px;border-radius:10px;margin-top:16px;font-size:22px;"></div>
 </div>
 
 <!-- ★ プット買い UI ★ -->
 <div id="putBuyBox" style="display:none;">
     <h3>プット買い（Put Buy）</h3>
-
-    株価 S:<br>
-    <input id="pb_S" type="number">
-
-    ストライク K:<br>
-    <input id="pb_K" type="number">
-
-    残存期間 T（年換算）:<br>
-    <input id="pb_T" type="number" placeholder="例: 0.1">
-
-    ボラティリティ σ:<br>
-    <input id="pb_sigma" type="number" placeholder="例: 0.20">
-
-    支払プレミアム（任意）:<br>
-    <input id="pb_premium" type="number" placeholder="例: 200">
-
+    株価 S:<br><input id="pb_S" type="number">
+    ストライク K:<br><input id="pb_K" type="number">
+    残存期間 T（年換算）:<br><input id="pb_T" type="number" placeholder="例: 0.1">
+    ボラティリティ σ:<br><input id="pb_sigma" type="number" placeholder="例: 0.20">
+    支払プレミアム（任意）:<br><input id="pb_premium" type="number" placeholder="例: 200">
     <button onclick="calcPutBuy()">プット買いを計算</button>
     <pre id="putBuyResult"></pre>
-
-    <!-- 次の一手カード -->
-    <div id="putBuyNextStep" style="
-        background:#f2f2f2;
-        padding:16px;
-        border-radius:10px;
-        margin-top:16px;
-        font-size:22px;
-    "></div>
+    <div id="putBuyNextStep" style="background:#f2f2f2;padding:16px;border-radius:10px;margin-top:16px;font-size:22px;"></div>
 </div>
 
 <!-- ★ ブルプット UI ★ -->
 <div id="bullPutBox" style="display:none;">
     <h3>ブル・プット・クレジットスプレッド</h3>
-
-    株価 S（日経225・任意入力可）:<br>
-    <input id="bp_S" type="number">
-
-    売りプットのストライク（K_short）:<br>
-    <input id="bp_K_short" type="number">
-
-    買いプットのストライク（K_long）:<br>
-    <input id="bp_K_long" type="number">
-
-    売りプットのプレミアム:<br>
-    <input id="bp_premium_short" type="number">
-
-    買いプットのプレミアム:<br>
-    <input id="bp_premium_long" type="number">
-
+    株価 S:<br><input id="bp_S" type="number">
+    売りプットのストライク（K_short）:<br><input id="bp_K_short" type="number">
+    買いプットのストライク（K_long）:<br><input id="bp_K_long" type="number">
+    売りプットのプレミアム:<br><input id="bp_premium_short" type="number">
+    買いプットのプレミアム:<br><input id="bp_premium_long" type="number">
     <button onclick="calcBullPut()">ブル・プット損益計算</button>
     <pre id="bullPutResult"></pre>
-
     <button onclick="loadBullPutStrikes()">ストライク候補を表示</button>
     <pre id="bullPutStrikes"></pre>
-
     <button onclick="loadBullPutPremiums()">プレミアム候補を表示</button>
     <pre id="bullPutPremiums"></pre>
-
-    <div style="font-size:20px; margin-top:10px; color:#333;">
-    📘 買いプット候補の出し方<br>
-    1. 売りプットのストライク（K_short）を入力してください。<br>
-    2. 「買いプット候補を表示」を押すと、過去3年の下落率から自動計算されます。
-    </div>
-
     <button onclick="loadBullPutLongCandidates()">買いプット候補を表示</button>
     <pre id="bullPutLongCandidates"></pre>
-
     <button onclick="calcBullPutLongPremium()">買いプットプレミアムを自動計算</button>
 </div>
 
 <!-- ★ ベアコール UI ★ -->
 <div id="bearCallBox" style="display:none;">
     <h3>ベア・コール・クレジットスプレッド</h3>
-
-    株価 S（日経225・任意入力可）:<br>
-    <input id="bc_S" type="number">
-
-    売りコールのストライク（K_short）:<br>
-    <input id="bc_K_short" type="number">
-
-    買いコールのストライク（K_long）:<br>
-    <input id="bc_K_long" type="number">
-
-    売りコールのプレミアム:<br>
-    <input id="bc_premium_short" type="number">
-
-    買いコールのプレミアム:<br>
-    <input id="bc_premium_long" type="number">
-
+    株価 S:<br><input id="bc_S" type="number">
+    売りコールのストライク（K_short）:<br><input id="bc_K_short" type="number">
+    買いコールのストライク（K_long）:<br><input id="bc_K_long" type="number">
+    売りコールのプレミアム:<br><input id="bc_premium_short" type="number">
+    買いコールのプレミアム:<br><input id="bc_premium_long" type="number">
     <button onclick="calcBearCall()">ベア・コール損益計算</button>
     <pre id="bearCallResult"></pre>
-
     <button onclick="loadBearCallStrikes()">ストライク候補を表示</button>
     <pre id="bearCallStrikes"></pre>
-
     <button onclick="loadBearCallPremiums()">プレミアム候補を表示</button>
     <pre id="bearCallPremiums"></pre>
-
-    <div style="font-size:20px; margin-top:10px; color:#333;">
-    📘 買いコール候補の出し方<br>
-    1. 売りコールのストライク（K_short）を入力してください。<br>
-    2. 「買いコール候補を表示」を押すと、過去3年の下落率から自動計算されます。
-    </div>
-
     <button onclick="loadBearCallLongCandidates()">買いコール候補を表示</button>
     <pre id="bearCallLongCandidates"></pre>
-
     <button onclick="calcBearCallLongPremium()">買いコールプレミアムを自動計算</button>
-    </div>
+</div>
 
 <!-- ★ ロールアウト UI ★ -->
 <div id="rolloutBox" style="display:none;">
     <h3>ロールアウト（期限延長）</h3>
-
-    株価 S:<br>
-    <input id="ro_S" type="number">
-
-    売りプットのストライク（K_short）:<br>
-    <input id="ro_K_short" type="number">
-
-    買いプットのストライク（K_long）:<br>
-    <input id="ro_K_long" type="number">
-
-    現在の受取クレジット:<br>
-    <input id="ro_credit" type="number">
-
-    IV（任意）:<br>
-    <input id="ro_iv" type="number" placeholder="例: 0.20">
-
-    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br>
-    <input id="ro_bias" type="number" placeholder="例: -1">
-
+    株価 S:<br><input id="ro_S" type="number">
+    売りプットのストライク（K_short）:<br><input id="ro_K_short" type="number">
+    買いプットのストライク（K_long）:<br><input id="ro_K_long" type="number">
+    現在の受取クレジット:<br><input id="ro_credit" type="number">
+    IV（任意）:<br><input id="ro_iv" type="number" placeholder="例: 0.20">
+    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br><input id="ro_bias" type="number" placeholder="例: -1">
     <button onclick="loadRolloutCandidates()">ロールアウト候補を表示</button>
     <pre id="rolloutCandidates"></pre>
-
     <button onclick="calcRolloutPNL()">ロールアウト損益計算</button>
     <pre id="rolloutPNL"></pre>
 </div>
@@ -1438,40 +1326,22 @@ def index():
 <!-- ★ ロールダウン UI ★ -->
 <div id="rolldownBox" style="display:none;">
     <h3>ロールダウン（ストライク調整）</h3>
-
-    株価 S:<br>
-    <input id="rd_S" type="number">
-
-    売りプットのストライク（K_short）:<br>
-    <input id="rd_K_short" type="number">
-
-    買いプットのストライク（K_long）:<br>
-    <input id="rd_K_long" type="number">
-
-    現在の受取クレジット:<br>
-    <input id="rd_credit" type="number">
-
-    IV（任意）:<br>
-    <input id="rd_iv" type="number" placeholder="例: 0.20">
-
-    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br>
-    <input id="rd_bias" type="number" placeholder="例: -1">
-
+    株価 S:<br><input id="rd_S" type="number">
+    売りプットのストライク（K_short）:<br><input id="rd_K_short" type="number">
+    買いプットのストライク（K_long）:<br><input id="rd_K_long" type="number">
+    現在の受取クレジット:<br><input id="rd_credit" type="number">
+    IV（任意）:<br><input id="rd_iv" type="number" placeholder="例: 0.20">
+    市場バイアス（-1 弱気 / 0 中立 / +1 強気）:<br><input id="rd_bias" type="number" placeholder="例: -1">
     <button onclick="loadRolldownCandidates()">ロールダウン候補を表示</button>
     <pre id="rolldownCandidates"></pre>
-
     <button onclick="calcRolldownPNL()">ロールダウン損益計算</button>
     <pre id="rolldownPNL"></pre>
 </div>
 
-<hr>
-
 <script>
-/* 共通: メニュー切替 */
 async function onMenuChange(){
     const menu = document.getElementById("menu").value;
 
-    // すべて非表示（必ずここに追加したボックスを含める）
     document.getElementById("insightsSection").style.display = "none";
     document.getElementById("callBuyBox").style.display = "none";
     document.getElementById("putBuyBox").style.display = "none";
@@ -1485,8 +1355,8 @@ async function onMenuChange(){
         return;
     }
     if(menu === "call_buy"){
-    document.getElementById("callBuyBox").style.display = "block";
-    return;
+        document.getElementById("callBuyBox").style.display = "block";
+        return;
     }
     if(menu === "put_buy"){
         document.getElementById("putBuyBox").style.display = "block";
@@ -1534,7 +1404,6 @@ async function calcCallBuy(){
         "現在の即時損益: " + profit_now + "\n" +
         "最大損失: " + paid;
 
-    // 次の一手（高度化ロジック）呼び出し
     await loadCallBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
 }
 
@@ -1621,10 +1490,8 @@ async function loadPutBuyNextStep(S, K, T, sigma, premium, price_now, delta, the
         "注意点: " + data.caution;
 }
 
-
-/* ブルプット / ベアコール 関数群（テンプレートリテラルを使わない） */
 async function loadBullPutStrikes(){
-    const data = await fetch(`/api/bull_put_strikes`).then(r=>r.json());
+    const data = await fetch("/api/bull_put_strikes").then(r=>r.json());
     document.getElementById("bullPutStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均下落率（3年・月末）: " + (data.avg_drop_rate * 100).toFixed(2) + "%\\n\\n" +
@@ -1635,7 +1502,7 @@ async function loadBullPutStrikes(){
 }
 
 async function loadBearCallStrikes(){
-    const data = await fetch(`/api/bear_call_strikes`).then(r => r.json());
+    const data = await fetch("/api/bear_call_strikes").then(r=>r.json());
     document.getElementById("bearCallStrikes").textContent =
         "📌 現在値 S: " + data.S + "\\n" +
         "📌 平均上昇率（3年・月末）: " + (data.avg_rise_rate * 100).toFixed(2) + "%\\n\\n" +
@@ -1681,7 +1548,6 @@ async function calcBearCall(){
         "現在の株価での損益: " + data.profit_at_S.toFixed(2);
 }
 
-/* プレミアム候補等（省略せずそのまま） */
 async function loadBullPutPremiums(){
     const T = 0.1;
     const data = await fetch("/api/bull_put_premium_candidates_new?T=" + T).then(r => r.json());
@@ -1713,7 +1579,6 @@ async function loadBearCallPremiums(){
         " → プレミアム: " + data.premium_aggressive;
 }
 
-/* ロング候補・プレミアム自動計算 */
 async function loadBullPutLongCandidates(){
     const K_short = Number(document.getElementById("bp_K_short").value);
     const data = await fetch("/api/bull_put_long_candidates?K_short=" + K_short).then(r => r.json());
@@ -1775,110 +1640,8 @@ async function loadMarketInsights(){
         "<b>【戦略ヒント】</b><br>" + info.hint_text;
 }
 
-/* ロールアウト / ロールダウン（テンプレートリテラルを使わない） */
-async function loadRolloutCandidates(){
-    const payload = {
-        S: Number(document.getElementById("ro_S").value),
-        short_put: Number(document.getElementById("ro_K_short").value),
-        long_put: Number(document.getElementById("ro_K_long").value),
-        credit: Number(document.getElementById("ro_credit").value),
-        iv: Number(document.getElementById("ro_iv").value || 0.20),
-        market_bias: Number(document.getElementById("ro_bias").value || 0)
-    };
-    const data = await fetch("/api/rollout_candidates", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    }).then(r => r.json());
-
-    let txt = "📌 ロールアウト候補一覧\\n\\n";
-    data.candidates.forEach(function(c){
-        txt += "shift: " + c.shift + "\\n";
-        txt += "new_short_put: " + c.new_short_put + "\\n";
-        txt += "new_long_put: " + c.new_long_put + "\\n";
-        txt += "estimated_credit: " + c.estimated_credit + "\\n";
-        txt += "distance_from_S: " + c.distance_from_S + "\\n\\n";
-    });
-    document.getElementById("rolloutCandidates").textContent = txt;
-}
-
-async function calcRolloutPNL(){
-    const payload = {
-        S: Number(document.getElementById("ro_S").value),
-        new_short_put: Number(document.getElementById("ro_K_short").value),
-        new_long_put: Number(document.getElementById("ro_K_long").value),
-        new_credit: Number(document.getElementById("ro_credit").value),
-        iv: Number(document.getElementById("ro_iv").value || 0.20),
-        market_bias: Number(document.getElementById("ro_bias").value || 0)
-    };
-    const data = await fetch("/api/rollout_pnl", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    }).then(r => r.json());
-
-    document.getElementById("rolloutPNL").textContent =
-        "最大利益: " + data.max_profit + "\\n" +
-        "最大損失: " + data.max_loss + "\\n" +
-        "ブレークイーブン: " + data.breakeven + "\\n" +
-        "安全度: " + data.safety_distance + "\\n" +
-        "IV効果: " + data.iv_effect + "%\\n" +
-        "市場コメント: " + data.bias_comment;
-}
-
-async function loadRolldownCandidates(){
-    const payload = {
-        S: Number(document.getElementById("rd_S").value),
-        short_put: Number(document.getElementById("rd_K_short").value),
-        long_put: Number(document.getElementById("rd_K_long").value),
-        credit: Number(document.getElementById("rd_credit").value),
-        iv: Number(document.getElementById("rd_iv").value || 0.20),
-        market_bias: Number(document.getElementById("rd_bias").value || 0)
-    };
-    const data = await fetch("/api/rolldown_candidates", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    }).then(r => r.json());
-
-    let txt = "📌 ロールダウン候補一覧\\n\\n";
-    data.candidates.forEach(function(c){
-        txt += "shift: " + c.shift + "\\n";
-        txt += "new_short_put: " + c.new_short_put + "\\n";
-        txt += "new_long_put: " + c.new_long_put + "\\n";
-        txt += "estimated_credit: " + c.estimated_credit + "\\n";
-        txt += "distance_from_S: " + c.distance_from_S + "\\n\\n";
-    });
-    document.getElementById("rolldownCandidates").textContent = txt;
-}
-
-async function calcRolldownPNL(){
-    const payload = {
-        S: Number(document.getElementById("rd_S").value),
-        new_short_put: Number(document.getElementById("rd_K_short").value),
-        new_long_put: Number(document.getElementById("rd_K_long").value),
-        new_credit: Number(document.getElementById("rd_credit").value),
-        iv: Number(document.getElementById("rd_iv").value || 0.20),
-        market_bias: Number(document.getElementById("rd_bias").value || 0)
-    };
-    const data = await fetch("/api/rolldown_pnl", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    }).then(r => r.json());
-
-    document.getElementById("rolldownPNL").textContent =
-        "最大利益: " + data.max_profit + "\\n" +
-        "最大損失: " + data.max_loss + "\\n" +
-        "ブレークイーブン: " + data.breakeven + "\\n" +
-        "安全度: " + data.safety_distance + "\\n" +
-        "IV効果: " + data.iv_effect + "%\\n" +
-        "市場コメント: " + data.bias_comment;
-}
-
 // HTMLダウンロード用ユーティリティ
 function collectStateForHtml() {
-  // 必要な要素を収集（不足があれば追加してください）
   const state = {
     timestamp: new Date().toISOString(),
     menu: document.getElementById("menu")?.value || "",
@@ -1941,7 +1704,6 @@ function escapeHtml(s) {
 }
 
 function buildHtmlDocument(state) {
-  // シンプルで読みやすいHTMLを作成
   const header = `
     <!doctype html>
     <html lang="ja">
@@ -2010,7 +1772,6 @@ function saveAsHtml() {
     alert("保存に失敗しました。コンソールを確認してください。");
   }
 }
-
 </script>
 
 </body>
