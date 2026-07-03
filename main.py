@@ -1255,6 +1255,16 @@ def index():
     <button onclick="calcCallBuy()">コール買いを計算</button>
     <pre id="callBuyResult"></pre>
     <div id="callBuyNextStep" style="background:#f2f2f2;padding:16px;border-radius:10px;margin-top:16px;font-size:22px;"></div>
+    <div id="callBuyQuestionExamples"
+        style="background:#eef7ff;padding:16px;border-radius:10px;margin-top:16px;font-size:20px;">
+    <b>📘 チャットで戦略相談する場合の質問例</b><br><br>
+    ・上記のコール買いを保有している状態で、<br>
+    　次の一手としてブルプットを追加した場合、損益構造はどう変化しますか？<br><br>
+    ・上記のコール買いを保有している状態で、<br>
+    　次の一手としてベアコールを追加した場合、どのようなメリット・デメリットがありますか？<br><br>
+    ・上記のコール買いに対して、<br>
+    　ブルプットを追加した場合と、ベアコールを追加した場合の違いを比較してください。
+    </div>
 </div>
 
 <!-- ★ プット買い UI ★ -->
@@ -1268,6 +1278,16 @@ def index():
     <button onclick="calcPutBuy()">プット買いを計算</button>
     <pre id="putBuyResult"></pre>
     <div id="putBuyNextStep" style="background:#f2f2f2;padding:16px;border-radius:10px;margin-top:16px;font-size:22px;"></div>
+    <div id="putBuyQuestionExamples"
+     style="background:#eef7ff;padding:16px;border-radius:10px;margin-top:16px;font-size:20px;">
+   <b>📘 チャットで戦略相談する場合の質問例</b><br><br>
+  ・上記のプット買いを保有している状態で、<br>
+    　次の一手としてブルプットを追加した場合、損益構造はどう変化しますか？<br><br>
+  ・上記のプット買いを保有している状態で、<br>
+    　次の一手としてベアコールを追加した場合、どのようなメリット・デメリットがありますか？<br><br>
+  ・上記のプット買いに対して、<br>
+    　ブルプットを追加した場合と、ベアコールを追加した場合の違いを比較してください。
+    </div>
 </div>
 
 <!-- ★ ブルプット UI ★ -->
