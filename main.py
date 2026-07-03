@@ -1249,7 +1249,7 @@ def index():
     <h3>コール買い（Call Buy）</h3>
     株価 S:<br><input id="cb_S" type="number">
     ストライク K:<br><input id="cb_K" type="number">
-    残存期間（月）:<br><input id="cb_T_month" type="number" placeholder="例: 1">
+    残存期間 T（年換算）:<br><input id="cb_T" type="number" placeholder="例: 0.1">
     ボラティリティ σ:<br><input id="cb_sigma" type="number" placeholder="例: 0.20">
     支払プレミアム（任意）:<br><input id="cb_premium" type="number" placeholder="例: 200">
     <button onclick="calcCallBuy()">コール買いを計算</button>
@@ -1262,7 +1262,7 @@ def index():
     <h3>プット買い（Put Buy）</h3>
     株価 S:<br><input id="pb_S" type="number">
     ストライク K:<br><input id="pb_K" type="number">
-    残存期間（月）:<br><input id="cb_T_month" type="number" placeholder="例: 1">
+    残存期間 T（年換算）:<br><input id="pb_T" type="number" placeholder="例: 0.1">
     ボラティリティ σ:<br><input id="pb_sigma" type="number" placeholder="例: 0.20">
     支払プレミアム（任意）:<br><input id="pb_premium" type="number" placeholder="例: 200">
     <button onclick="calcPutBuy()">プット買いを計算</button>
@@ -1387,11 +1387,7 @@ async function onMenuChange(){
 async function calcCallBuy(){
     const S = Number(document.getElementById("cb_S").value);
     const K = Number(document.getElementById("cb_K").value);
-
-    // 月入力 → 年換算
-    const T_month = Number(document.getElementById("cb_T_month").value);
-    const T = T_month / 12;
-
+    const T = Number(document.getElementById("cb_T").value);
     const sigma = Number(document.getElementById("cb_sigma").value);
     const premium = Number(document.getElementById("cb_premium").value);
 
@@ -1402,14 +1398,14 @@ async function calcCallBuy(){
     const profit_now = bs.price - paid;
 
     document.getElementById("callBuyResult").textContent =
-        "理論価格: " + bs.price + "\n" +
-        "Delta: " + gk.delta + "\n" +
-        "Gamma: " + gk.gamma + "\n" +
-        "Theta: " + gk.theta + "\n" +
-        "Vega: " + gk.vega + "\n" +
-        "Rho: " + gk.rho + "\n\n" +
-        "支払プレミアム: " + paid + "\n" +
-        "現在の即時損益: " + profit_now + "\n" +
+        "理論価格: " + bs.price + "\\n" +
+        "Delta: " + gk.delta + "\\n" +
+        "Gamma: " + gk.gamma + "\\n" +
+        "Theta: " + gk.theta + "\\n" +
+        "Vega: " + gk.vega + "\\n" +
+        "Rho: " + gk.rho + "\\n\\n" +
+        "支払プレミアム: " + paid + "\\n" +
+        "現在の即時損益: " + profit_now + "\\n" +
         "最大損失: " + paid;
 
     await loadCallBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
@@ -1447,10 +1443,7 @@ async function loadCallBuyNextStep(S, K, T, sigma, premium, price_now, delta, th
 async function calcPutBuy(){
     const S = Number(document.getElementById("pb_S").value);
     const K = Number(document.getElementById("pb_K").value);
-
-    const T_month = Number(document.getElementById("pb_T_month").value);
-    const T = T_month / 12;
-
+    const T = Number(document.getElementById("pb_T").value);
     const sigma = Number(document.getElementById("pb_sigma").value);
     const premium = Number(document.getElementById("pb_premium").value);
 
@@ -1461,14 +1454,14 @@ async function calcPutBuy(){
     const profit_now = bs.price - paid;
 
     document.getElementById("putBuyResult").textContent =
-        "理論価格: " + bs.price + "\n" +
-        "Delta: " + gk.delta + "\n" +
-        "Gamma: " + gk.gamma + "\n" +
-        "Theta: " + gk.theta + "\n" +
-        "Vega: " + gk.vega + "\n" +
-        "Rho: " + gk.rho + "\n\n" +
-        "支払プレミアム: " + paid + "\n" +
-        "現在の即時損益: " + profit_now + "\n" +
+        "理論価格: " + bs.price + "\\n" +
+        "Delta: " + gk.delta + "\\n" +
+        "Gamma: " + gk.gamma + "\\n" +
+        "Theta: " + gk.theta + "\\n" +
+        "Vega: " + gk.vega + "\\n" +
+        "Rho: " + gk.rho + "\\n\\n" +
+        "支払プレミアム: " + paid + "\\n" +
+        "現在の即時損益: " + profit_now + "\\n" +
         "最大損失: " + paid;
 
     await loadPutBuyNextStep(S, K, T, sigma, paid, bs.price, gk.delta, gk.theta);
