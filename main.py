@@ -1249,7 +1249,7 @@ def index():
     <h3>コール買い（Call Buy）</h3>
     株価 S:<br><input id="cb_S" type="number">
     ストライク K:<br><input id="cb_K" type="number">
-    残存期間 T（年換算）:<br><input id="cb_T" type="number" placeholder="例: 0.1">
+    残存期間 T（年換算）:<br><input id="cb_T" type="number" placeholder="例: 1週間=0.019 / 1ヶ月=0.082">
     ボラティリティ σ:<br><input id="cb_sigma" type="number" placeholder="例: 0.20">
     支払プレミアム（任意）:<br><input id="cb_premium" type="number" placeholder="例: 200">
     <button onclick="calcCallBuy()">コール買いを計算</button>
@@ -1272,7 +1272,7 @@ def index():
     <h3>プット買い（Put Buy）</h3>
     株価 S:<br><input id="pb_S" type="number">
     ストライク K:<br><input id="pb_K" type="number">
-    残存期間 T（年換算）:<br><input id="pb_T" type="number" placeholder="例: 0.1">
+    残存期間 T（年換算）:<br><input id="cb_T" type="number" placeholder="例: 1週間=0.019 / 1ヶ月=0.082">
     ボラティリティ σ:<br><input id="pb_sigma" type="number" placeholder="例: 0.20">
     支払プレミアム（任意）:<br><input id="pb_premium" type="number" placeholder="例: 200">
     <button onclick="calcPutBuy()">プット買いを計算</button>
