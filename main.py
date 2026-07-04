@@ -1672,7 +1672,7 @@ async function loadMarketInsights() {
         "<b>📌 株価 S:</b> " + info.S + "<br>" +
         "<b>📌 インプライドボラティリティ（IV） σ:</b> " + info.sigma.toFixed(4) +
         "（" + (info.sigma * 100).toFixed(2) + "%）<br>" +
-        "<span style='color:#666; font-size:13px;'>IV判定: " + ivLevel + "</span><br><br>" +
+        "<span style='color:#666; font-size:16px;'>IV判定: " + ivLevel + "</span><br><br>" +
 
         "<b>【過去1年の傾向】</b><br>" +
         "平均上昇率: " + (info.avg_rise * 100).toFixed(2) + "%<br>" +
