@@ -1654,22 +1654,40 @@ async function calcBearCallLongPremium(){
     document.getElementById("bc_premium_long").value = data.premium_theoretical;
 }
 
-async function loadMarketInsights(){
-    const info = await fetch("/api/market_insights").then(r=>r.json());
+async function loadMarketInsights() {
+    const info = await fetch("/api/market_insights").then(r => r.json());
+
+    // IVレベル判定
+    const iv = info.sigma;
+    let ivLevel = "";
+    if (iv < 0.15) {
+        ivLevel = "IVは低め（コール買い向き）";
+    } else if (iv < 0.25) {
+        ivLevel = "IVは普通";
+    } else {
+        ivLevel = "IVは高め（コール買いは割高）";
+    }
+
     document.getElementById("insightsBox").innerHTML =
         "<b>📌 株価 S:</b> " + info.S + "<br>" +
-        "<b>📌 ボラティリティ σ:</b> " + info.sigma.toFixed(4) + "<br><br>" +
+        "<b>📌 インプライドボラティリティ（IV） σ:</b> " + info.sigma.toFixed(4) +
+        "（" + (info.sigma * 100).toFixed(2) + "%）<br>" +
+        "<span style='color:#666; font-size:13px;'>IV判定: " + ivLevel + "</span><br><br>" +
+
         "<b>【過去1年の傾向】</b><br>" +
         "平均上昇率: " + (info.avg_rise * 100).toFixed(2) + "%<br>" +
         "平均下落率: " + (info.avg_drop * 100).toFixed(2) + "%<br>" +
         "最大上昇率: " + (info.max_rise * 100).toFixed(2) + "%<br>" +
         "最大下落率: " + (info.max_drop * 100).toFixed(2) + "%<br><br>" +
+
         "<b>【勝率（簡易バックテスト）】</b><br>" +
         "ブルプット勝率: " + (info.bull_put_win_rate * 100).toFixed(1) + "%<br>" +
         "ベアコール勝率: " + (info.bear_call_win_rate * 100).toFixed(1) + "%<br><br>" +
+
         "<b>【現在の位置】</b><br>" +
         "過去1年レンジ: " + info.range_low + " ～ " + info.range_high + "<br>" +
         "現在値の位置: " + (info.position_percent * 100).toFixed(1) + "%<br><br>" +
+
         "<b>【戦略ヒント】</b><br>" + info.hint_text;
 }
 
