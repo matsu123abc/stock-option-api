@@ -1657,22 +1657,11 @@ async function calcBearCallLongPremium(){
 async function loadMarketInsights() {
     const info = await fetch("/api/market_insights").then(r => r.json());
 
-    // IVレベル判定
-    const iv = info.sigma;
-    let ivLevel = "";
-    if (iv < 0.15) {
-        ivLevel = "IVは低め（コール買い向き）";
-    } else if (iv < 0.25) {
-        ivLevel = "IVは普通";
-    } else {
-        ivLevel = "IVは高め（コール買いは割高）";
-    }
-
     document.getElementById("insightsBox").innerHTML =
         "<b>📌 株価 S:</b> " + info.S + "<br>" +
-        "<b>📌 インプライドボラティリティ（IV） σ:</b> " + info.sigma.toFixed(4) +
+        "<b>📌 ヒストリカルボラティリティ（HV）:</b> " + info.sigma.toFixed(4) +
         "（" + (info.sigma * 100).toFixed(2) + "%）<br>" +
-        "<span style='color:#666; font-size:16px;'>IV判定: " + ivLevel + "</span><br><br>" +
+        "<span style='color:#666; font-size:15px;'>※HVは過去の値動きから計算したボラティリティです（IVとは異なります）</span><br><br>" +
 
         "<b>【過去1年の傾向】</b><br>" +
         "平均上昇率: " + (info.avg_rise * 100).toFixed(2) + "%<br>" +
