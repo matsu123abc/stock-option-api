@@ -26,7 +26,7 @@ def classify_line(line: str):
         return "orderbook"
     if "現値" in line:
         return "last"
-    if re.search(r"\d{5}", line):
+    if re.search(r"\d{5}", line):  # 行使価格
         return "strike"
     return "other"
 
@@ -65,10 +65,12 @@ def parse_volume(line):
     return int(m.group(1)) if m else None
 
 # ---------------------------------------------------------
-# ④ 行をまとめて JSON 化
+# ④ 複数ストライクを配列で返すパーサー
 # ---------------------------------------------------------
 def parse_lines(lines):
-    result = {
+    results = []
+
+    current = {
         "strike": None,
         "iv": None,
         "delta": None,
@@ -86,15 +88,32 @@ def parse_lines(lines):
     for line in lines:
         t = classify_line(line)
 
+        # 新しいストライクが来たら、前のストライクを保存
         if t == "strike":
-            result["strike"] = parse_strike(line)
+            if current["strike"] is not None:
+                results.append(current)
+
+            current = {
+                "strike": parse_strike(line),
+                "iv": None,
+                "delta": None,
+                "gamma": None,
+                "theta": None,
+                "vega": None,
+                "bid": None,
+                "bid_size": None,
+                "ask": None,
+                "ask_size": None,
+                "last": None,
+                "volume": None
+            }
 
         elif t == "iv":
-            result["iv"] = parse_iv(line)
+            current["iv"] = parse_iv(line)
 
         elif t == "greeks":
             delta, gamma, theta, vega = parse_greeks(line)
-            result.update({
+            current.update({
                 "delta": delta,
                 "gamma": gamma,
                 "theta": theta,
@@ -105,7 +124,7 @@ def parse_lines(lines):
             parsed = parse_orderbook(line)
             if parsed:
                 bid, bid_size, ask, ask_size = parsed
-                result.update({
+                current.update({
                     "bid": bid,
                     "bid_size": bid_size,
                     "ask": ask,
@@ -113,13 +132,17 @@ def parse_lines(lines):
                 })
 
         elif t == "last":
-            result["last"] = parse_last(line)
-            result["volume"] = parse_volume(line)
+            current["last"] = parse_last(line)
+            current["volume"] = parse_volume(line)
 
-    return result
+    # 最後のストライクを追加
+    if current["strike"] is not None:
+        results.append(current)
+
+    return results
 
 # ---------------------------------------------------------
-# ⑤ API：画面コピー → JSON
+# ⑤ API：画面コピー → JSON（複数ストライク）
 # ---------------------------------------------------------
 @app.post("/api/parse_market_text")
 def parse_market_text(payload: dict):
@@ -129,7 +152,7 @@ def parse_market_text(payload: dict):
     return parsed
 
 # ---------------------------------------------------------
-# ⑥ UI（POSTが確実に動く修正版）
+# ⑥ UI（POST保証・複数JSON対応）
 # ---------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -154,14 +177,13 @@ pre { background: #f0f0f0; padding: 15px; border-radius: 10px; }
 
 <button onclick="convert()">JSON化する</button>
 
-<h3>📘 JSON 出力</h3>
+<h3>📘 JSON 出力（複数ストライク対応）</h3>
 <pre id="jsonOutput"></pre>
 
 <script>
 async function convert(){
     const raw = document.getElementById("rawText").value;
 
-    // ★ Azure App Service で POST が GET に変換されないように絶対パス化
     const url = window.location.origin + "/api/parse_market_text";
 
     const res = await fetch(url, {
