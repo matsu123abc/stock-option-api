@@ -1,39 +1,51 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-import math
+import numpy as np
 
 app = FastAPI()
 
-# ==============================
+# ============================================================
 # 1. 損益計算ロジック（ひながた）
-# ==============================
+# ============================================================
 
 def simulate_call_spread(
-    spot: float,
-    k_short: float,
-    k_long: float,
-    size: int,
-    premium: float,
-    iv: float,
-    delta: float,
-    gamma: float,
-    theta: float,
-    vega: float,
-    adjustment: str
+    spot,
+    k_short,
+    premium_short,
+    k_long,
+    premium_long,
+    size,
+    iv,
+    delta,
+    gamma,
+    theta,
+    vega,
+    adjustment
 ):
     """
-    ひながた用の簡易シミュレーション。
-    実際にはここに詳細な損益曲線・Greeks合成などを実装していく。
+    ひながたのコールスプレッド損益計算。
+    実際のロジックはここに肉付けしていく。
     """
 
-    # ベースの損益（満期時のざっくり計算）
-    # コールスプレッド：ショートK_short、ロングK_long
-    # payoff = min(max(spot - k_short, 0), k_long - k_short) - premium
-    intrinsic = max(spot - k_short, 0)
-    intrinsic = min(intrinsic, k_long - k_short)
-    base_pnl = intrinsic - premium
+    # ネットプレミアム（受け取りが +、支払いが -）
+    net_premium = premium_short + premium_long
 
-    # 調整案ごとの簡易評価（ひながた）
+    # 最大利益
+    max_profit = net_premium
+
+    # 最大損失
+    spread_width = k_long - k_short
+    max_loss = spread_width - net_premium
+
+    # ブレークイーブン
+    breakeven = k_short + net_premium
+
+    # 満期損益（spot を使った簡易版）
+    intrinsic = max(spot - k_short, 0)
+    intrinsic = min(intrinsic, spread_width)
+    pnl = intrinsic - net_premium
+
+    # 調整案コメント
     if adjustment == "none":
         adj_comment = "調整なし（現状維持）"
     elif adjustment == "roll_up":
@@ -45,57 +57,77 @@ def simulate_call_spread(
     else:
         adj_comment = "不明な調整案"
 
-    # ここではひながたとして、Greeksはそのまま返すだけ
+    # Greeks（ひながた）
     greeks = {
+        "iv": iv,
         "delta": delta,
         "gamma": gamma,
         "theta": theta,
-        "vega": vega,
-        "iv": iv,
+        "vega": vega
     }
 
     return {
         "spot": spot,
         "k_short": k_short,
+        "premium_short": premium_short,
         "k_long": k_long,
+        "premium_long": premium_long,
         "size": size,
-        "premium": premium,
-        "base_pnl": base_pnl * size,
+        "net_premium": net_premium,
+        "max_profit": max_profit * size,
+        "max_loss": max_loss * size,
+        "breakeven": breakeven,
+        "pnl_at_spot": pnl * size,
         "adjustment": adjustment,
         "adjustment_comment": adj_comment,
-        "greeks": greeks,
+        "greeks": greeks
     }
 
-# ==============================
+# ============================================================
 # 2. API エンドポイント
-# ==============================
+# ============================================================
 
 @app.post("/api/simulate")
 def api_simulate(payload: dict):
-    spot    = float(payload.get("spot", 0))
-    k_short = float(payload.get("k_short", 0))
-    k_long  = float(payload.get("k_long", 0))
-    size    = int(payload.get("size", 1))
-    premium = float(payload.get("premium", 0))
 
-    iv      = float(payload.get("iv", 0))
-    delta   = float(payload.get("delta", 0))
-    gamma   = float(payload.get("gamma", 0))
-    theta   = float(payload.get("theta", 0))
-    vega    = float(payload.get("vega", 0))
+    spot = float(payload.get("spot", 0))
+
+    k_short = float(payload.get("k_short", 0))
+    premium_short = float(payload.get("premium_short", 0))
+
+    k_long = float(payload.get("k_long", 0))
+    premium_long = float(payload.get("premium_long", 0))
+
+    size = int(payload.get("size", 1))
+
+    iv = float(payload.get("iv", 0))
+    delta = float(payload.get("delta", 0))
+    gamma = float(payload.get("gamma", 0))
+    theta = float(payload.get("theta", 0))
+    vega = float(payload.get("vega", 0))
 
     adjustment = payload.get("adjustment", "none")
 
     result = simulate_call_spread(
-        spot, k_short, k_long, size, premium,
-        iv, delta, gamma, theta, vega,
+        spot,
+        k_short,
+        premium_short,
+        k_long,
+        premium_long,
+        size,
+        iv,
+        delta,
+        gamma,
+        theta,
+        vega,
         adjustment
     )
+
     return result
 
-# ==============================
+# ============================================================
 # 3. UI（ひながた）
-# ==============================
+# ============================================================
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -144,23 +176,26 @@ h2 { margin-top: 0; }
   <label>K_short（売りストライク）</label>
   <input id="k_short" type="number" step="5" />
 
+  <label>premium_short（受け取り）</label>
+  <input id="premium_short" type="number" step="0.1" />
+
   <label>K_long（買いストライク）</label>
   <input id="k_long" type="number" step="5" />
 
+  <label>premium_long（支払い）</label>
+  <input id="premium_long" type="number" step="0.1" />
+
   <label>size（枚数）</label>
   <input id="size" type="number" step="1" value="1" />
-
-  <label>premium（受け取り or 支払い）</label>
-  <input id="premium" type="number" step="0.1" />
 </div>
 
 <div class="section">
   <h3>③ 調整ロジック案（選択）</h3>
   <select id="adjustment">
     <option value="none">調整なし（現状維持）</option>
-    <option value="roll_up">ロールアップ（ショートストライクを上にずらす）</option>
-    <option value="roll_down">ロールダウン（ショートストライクを下にずらす）</option>
-    <option value="leg_out">レッグ外し（ロング側を外すなど）</option>
+    <option value="roll_up">ロールアップ</option>
+    <option value="roll_down">ロールダウン</option>
+    <option value="leg_out">レッグ外し</option>
   </select>
 </div>
 
@@ -172,17 +207,21 @@ h2 { margin-top: 0; }
 <script>
 async function simulate(){
   const payload = {
-    spot:    parseFloat(document.getElementById("spot").value || 0),
-    k_short: parseFloat(document.getElementById("k_short").value || 0),
-    k_long:  parseFloat(document.getElementById("k_long").value || 0),
-    size:    parseInt(document.getElementById("size").value || 1),
-    premium: parseFloat(document.getElementById("premium").value || 0),
+    spot: parseFloat(document.getElementById("spot").value || 0),
 
-    iv:      parseFloat(document.getElementById("iv").value || 0),
-    delta:   parseFloat(document.getElementById("delta").value || 0),
-    gamma:   parseFloat(document.getElementById("gamma").value || 0),
-    theta:   parseFloat(document.getElementById("theta").value || 0),
-    vega:    parseFloat(document.getElementById("vega").value || 0),
+    k_short: parseFloat(document.getElementById("k_short").value || 0),
+    premium_short: parseFloat(document.getElementById("premium_short").value || 0),
+
+    k_long: parseFloat(document.getElementById("k_long").value || 0),
+    premium_long: parseFloat(document.getElementById("premium_long").value || 0),
+
+    size: parseInt(document.getElementById("size").value || 1),
+
+    iv: parseFloat(document.getElementById("iv").value || 0),
+    delta: parseFloat(document.getElementById("delta").value || 0),
+    gamma: parseFloat(document.getElementById("gamma").value || 0),
+    theta: parseFloat(document.getElementById("theta").value || 0),
+    vega: parseFloat(document.getElementById("vega").value || 0),
 
     adjustment: document.getElementById("adjustment").value
   };
