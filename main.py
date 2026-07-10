@@ -23,27 +23,30 @@ def simulate_call_spread(
     adjustment
 ):
     """
-    ひながたのコールスプレッド損益計算。
-    実際のロジックはここに肉付けしていく。
+    コールスプレッド損益計算（プレミアムは両方とも正の値で入力）。
+    premium_short: 受け取り（+）
+    premium_long:  支払い（+）として入力し、計算時に差し引く。
     """
 
-    # ネットプレミアム（受け取りが +、支払いが -）
-    net_premium = premium_short + premium_long
+    # ネットプレミアム（受け取り − 支払い）
+    net_premium = premium_short - premium_long  # 例: 2300 - 1830 = 470
 
-    # 最大利益
-    max_profit = net_premium
+    # スプレッド幅
+    spread_width = k_long - k_short  # 例: 70000 - 69000 = 1000
 
-    # 最大損失
-    spread_width = k_long - k_short
-    max_loss = spread_width - net_premium
+    # 最大利益（ネットプレミアム）
+    max_profit = net_premium  # 例: 470
 
-    # ブレークイーブン
-    breakeven = k_short + net_premium
+    # 最大損失（スプレッド幅 − ネットプレミアム）
+    max_loss = spread_width - net_premium  # 例: 1000 - 470 = 530
 
-    # 満期損益（spot を使った簡易版）
+    # ブレークイーブン（K_short + ネットプレミアム）
+    breakeven = k_short + net_premium  # 例: 69000 + 470 = 69470
+
+    # 満期損益（現在の spot での損益）
     intrinsic = max(spot - k_short, 0)
     intrinsic = min(intrinsic, spread_width)
-    pnl = intrinsic - net_premium
+    pnl = intrinsic - net_premium  # 例: spot=68557 → intrinsic=0 → -470
 
     # 調整案コメント
     if adjustment == "none":
@@ -57,7 +60,6 @@ def simulate_call_spread(
     else:
         adj_comment = "不明な調整案"
 
-    # Greeks（ひながた）
     greeks = {
         "iv": iv,
         "delta": delta,
