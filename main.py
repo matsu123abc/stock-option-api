@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 import re
 import jaconv
 
@@ -129,7 +129,7 @@ def parse_market_text(payload: dict):
     return parsed
 
 # ---------------------------------------------------------
-# ⑥ UI（画面コピー貼り付け → JSON化）
+# ⑥ UI（POSTが確実に動く修正版）
 # ---------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -161,7 +161,10 @@ pre { background: #f0f0f0; padding: 15px; border-radius: 10px; }
 async function convert(){
     const raw = document.getElementById("rawText").value;
 
-    const res = await fetch("/api/parse_market_text", {
+    // ★ Azure App Service で POST が GET に変換されないように絶対パス化
+    const url = window.location.origin + "/api/parse_market_text";
+
+    const res = await fetch(url, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({text: raw})
@@ -176,4 +179,3 @@ async function convert(){
 </body>
 </html>
 """
-
