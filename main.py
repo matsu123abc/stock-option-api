@@ -138,20 +138,23 @@ def index():
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>コールスプレッド調整シミュレーション（ひながた）</title>
+<title>コールスプレッド調整シミュレーション（満期損益表）</title>
 <style>
 body { font-family: sans-serif; padding: 20px; font-size: 16px; }
 input, select { width: 100%; padding: 6px; margin: 4px 0; font-size: 16px; }
 button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; }
-table { border-collapse: collapse; margin-top: 10px; }
-th, td { border: 1px solid #999; padding: 6px 10px; }
+table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+th, td { border: 1px solid #999; padding: 6px 10px; text-align: right; }
+th { background: #f7f7f7; text-align: center; }
 .section { margin-bottom: 16px; }
 h2 { margin-top: 0; }
+.highlight { background:#fff3cd; font-weight:700; }
+.small { font-size: 0.9em; color:#555; text-align:left; }
 </style>
 </head>
 <body>
 
-<h2>📌 コールスプレッド調整シミュレーション（ひながた）</h2>
+<h2>📌 コールスプレッド調整シミュレーション（満期損益表）</h2>
 
 <div class="section">
   <h3>① 市場データ（手入力）</h3>
@@ -208,6 +211,13 @@ h2 { margin-top: 0; }
 <div id="result_area"></div>
 
 <script>
+function fmt(n){
+  if (n === null || n === undefined || isNaN(n)) return "-";
+  const sign = n > 0 ? "+" : (n < 0 ? "−" : "");
+  const abs = Math.abs(Math.round(n));
+  return sign + abs.toLocaleString();
+}
+
 async function simulate(){
   const payload = {
     spot: parseFloat(document.getElementById("spot").value || 0),
@@ -237,31 +247,71 @@ async function simulate(){
 
   const data = await res.json();
 
+  // 基本指標表示
   let html = "";
-
-  // 基本損益指標
-  html += "<h4>基本損益指標</h4>";
-  html += "<table><tr><th>項目</th><th>値</th></tr>";
-  html += `<tr><td>ネットプレミアム</td><td>${data.net_premium}</td></tr>`;
-  html += `<tr><td>最大利益</td><td>${data.max_profit}</td></tr>`;
-  html += `<tr><td>最大損失</td><td>${data.max_loss}</td></tr>`;
-  html += `<tr><td>ブレークイーブン</td><td>${data.breakeven}</td></tr>`;
-  html += `<tr><td>現在値での損益</td><td>${data.pnl_at_spot}</td></tr>`;
+  html += "<table><tr><th class='small'>項目</th><th>値</th></tr>";
+  html += `<tr><td class='small'>ネットプレミアム</td><td>${fmt(data.net_premium)}</td></tr>`;
+  html += `<tr><td class='small'>最大利益</td><td>${fmt(data.max_profit)}</td></tr>`;
+  html += `<tr><td class='small'>最大損失</td><td>${fmt(-Math.abs(data.max_loss))}</td></tr>`;
+  html += `<tr><td class='small'>ブレークイーブン</td><td>${(data.breakeven).toLocaleString()}</td></tr>`;
+  html += `<tr><td class='small'>現在値での満期想定損益</td><td>${fmt(data.net_premium - Math.min(Math.max(data.spot - data.k_short,0), data.k_long - data.k_short))}</td></tr>`;
   html += "</table>";
 
   // Greeks
   html += "<h4>Greeks</h4>";
-  html += "<table><tr><th>指標</th><th>値</th></tr>";
-  html += `<tr><td>IV</td><td>${data.greeks.iv}</td></tr>`;
-  html += `<tr><td>Delta</td><td>${data.greeks.delta}</td></tr>`;
-  html += `<tr><td>Gamma</td><td>${data.greeks.gamma}</td></tr>`;
-  html += `<tr><td>Theta</td><td>${data.greeks.theta}</td></tr>`;
-  html += `<tr><td>Vega</td><td>${data.greeks.vega}</td></tr>`;
+  html += "<table><tr><th class='small'>指標</th><th>値</th></tr>";
+  html += `<tr><td class='small'>IV</td><td>${data.greeks.iv}</td></tr>`;
+  html += `<tr><td class='small'>Delta</td><td>${data.greeks.delta}</td></tr>`;
+  html += `<tr><td class='small'>Gamma</td><td>${data.greeks.gamma}</td></tr>`;
+  html += `<tr><td class='small'>Theta</td><td>${data.greeks.theta}</td></tr>`;
+  html += `<tr><td class='small'>Vega</td><td>${data.greeks.vega}</td></tr>`;
   html += "</table>";
 
-  // 調整案コメント
-  html += "<h4>調整案</h4>";
-  html += `<p>${data.adjustment_comment}</p>`;
+  // 満期損益表（代表的な SQ 値）
+  html += "<h4>満期損益表（代表的な SQ 値）</h4>";
+
+  // SQ 値のレンジを作る（K_short -2000 〜 K_long +2000、刻み 500）
+  const kshort = Number(data.k_short);
+  const klong = Number(data.k_long);
+  const net = Number(data.net_premium);
+  const spread = klong - kshort;
+
+  let sqs = [];
+  const start = Math.max(0, kshort - 2000);
+  const end = klong + 2000;
+  for(let s = start; s <= end; s += 500) sqs.push(s);
+
+  // 重要点を確実に含める（spot, k_short, breakeven, k_long）
+  const important = [Math.round(data.spot), kshort, data.breakeven, klong];
+  important.forEach(v => { if (!sqs.includes(v)) sqs.push(v); });
+
+  // ソート
+  sqs = Array.from(new Set(sqs)).sort((a,b)=>a-b);
+
+  // テーブル作成
+  html += "<table><tr><th>SQ</th><th>intrinsic</th><th>満期損益</th></tr>";
+  for(const sq of sqs){
+    const intrinsic = Math.min(Math.max(sq - kshort, 0), spread);
+    // 満期損益の定義：受取クレジット − intrinsic（受取がプラス）
+    const pnl = net - intrinsic;
+    // 強調条件
+    const isSpot = (sq === Math.round(data.spot));
+    const isKshort = (sq === kshort);
+    const isKlong = (sq === klong);
+    const isBE = (sq === data.breakeven);
+
+    let trClass = "";
+    if (isBE) trClass = "highlight";
+    html += `<tr${trClass? " class='"+trClass+"'" : ""}>`;
+    html += `<td style="text-align:center">${sq.toLocaleString()}</td>`;
+    html += `<td>${intrinsic.toLocaleString()}</td>`;
+    html += `<td>${fmt(pnl)}</td>`;
+    html += "</tr>";
+  }
+  html += "</table>";
+
+  // 補足説明
+  html += "<p class='small'>注：満期損益は「受取クレジット − intrinsic」で計算しています。正の値は利益、負の値は損失を示します。</p>";
 
   document.getElementById("result_area").innerHTML = html;
 }
