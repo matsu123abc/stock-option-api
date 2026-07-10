@@ -5,18 +5,12 @@ import re
 
 app = FastAPI()
 
-# ---------------------------------------------------------
-# 前処理：全角→半角・行分割
-# ---------------------------------------------------------
 def preprocess(raw: str):
     raw = jaconv.z2h(raw, digit=True, ascii=True)
     lines = raw.split("\n")
     clean = [l.strip() for l in lines if l.strip() != ""]
     return clean
 
-# ---------------------------------------------------------
-# 数値変換ヘルパー
-# ---------------------------------------------------------
 def to_float(s):
     try:
         return float(s.replace(",", ""))
@@ -30,13 +24,12 @@ def to_int(s):
         return None
 
 def qty(s):
-    # "(25)" → 25
     m = re.search(r"\((\d+)\)", s)
     return int(m.group(1)) if m else None
 
-# ---------------------------------------------------------
-# コール18行セットをパース
-# ---------------------------------------------------------
+# -------------------------
+# コール18行
+# -------------------------
 def parse_call(block):
     return {
         "iv": to_float(block[1]),
@@ -48,40 +41,28 @@ def parse_call(block):
         "open": to_float(block[7]),
         "high": to_float(block[8]),
         "low": to_float(block[9]),
-
-        # 売気配（価格＋数量）
         "bid": to_float(block[10]),
         "bid_size": qty(block[11]),
-
-        # 買気配（価格＋数量）
         "ask": to_float(block[12]),
         "ask_size": qty(block[13]),
-
         "last": to_float(block[14]),
         "change": to_float(block[15]),
         "volume": to_int(block[16]),
-
-        # ★ strike 正しく取得
         "strike": to_int(block[17])
     }
 
-# ---------------------------------------------------------
-# プット17行セットをパース
-# ---------------------------------------------------------
+# -------------------------
+# プット17行
+# -------------------------
 def parse_put(block):
     return {
         "last": to_float(block[0]),
         "change": to_float(block[1]),
         "volume": to_int(block[2]),
-
-        # 買気配（価格＋数量）
         "ask": to_float(block[3]),
         "ask_size": qty(block[4]),
-
-        # 売気配（価格＋数量）
         "bid": to_float(block[5]),
         "bid_size": qty(block[6]),
-
         "open": to_float(block[7]),
         "high": to_float(block[8]),
         "low": to_float(block[9]),
@@ -93,41 +74,32 @@ def parse_put(block):
         "vega": to_float(block[15])
     }
 
-# ---------------------------------------------------------
-# 全行から 35行セット（コール18＋プット17）を抽出
-# ---------------------------------------------------------
+# -------------------------
+# ヘッダー除去 → 35行セット抽出
+# -------------------------
 def parse_lines(lines):
     results = []
-    i = 0
-    n = len(lines)
 
-    while i < n:
-        if lines[i].startswith("新規"):
-            # コール18行＋プット17行＝35行必要
-            if i + 34 < n:
-                call_block = lines[i:i+18]
-                put_block  = lines[i+18:i+35]
+    # ① 「新規」行の位置を探す
+    start_indices = [i for i, line in enumerate(lines) if line.startswith("新規")]
 
-                call_json = parse_call(call_block)
-                put_json  = parse_put(put_block)
+    for start in start_indices:
+        # ② コール18行＋プット17行が揃っているか
+        if start + 34 < len(lines):
+            call_block = lines[start:start+18]
+            put_block  = lines[start+18:start+35]
 
-                results.append({
-                    "strike": call_json["strike"],
-                    "call": call_json,
-                    "put": put_json
-                })
+            call_json = parse_call(call_block)
+            put_json  = parse_put(put_block)
 
-                i += 35
-            else:
-                break
-        else:
-            i += 1
+            results.append({
+                "strike": call_json["strike"],
+                "call": call_json,
+                "put": put_json
+            })
 
     return results
 
-# ---------------------------------------------------------
-# API：画面コピー → JSON
-# ---------------------------------------------------------
 @app.post("/api/parse_market_text")
 def parse_market_text(payload: dict):
     raw = payload.get("text", "")
@@ -135,9 +107,6 @@ def parse_market_text(payload: dict):
     parsed = parse_lines(lines)
     return parsed
 
-# ---------------------------------------------------------
-# UI：画面コピー貼り付け → JSON化
-# ---------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index():
     return """
