@@ -141,7 +141,8 @@ def index():
 body { font-family: sans-serif; padding: 20px; font-size: 16px; }
 input, select { width: 100%; padding: 6px; margin: 4px 0; font-size: 16px; }
 button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; }
-pre { background: #f0f0f0; padding: 10px; border-radius: 6px; white-space: pre-wrap; }
+table { border-collapse: collapse; margin-top: 10px; }
+th, td { border: 1px solid #999; padding: 6px 10px; }
 .section { margin-bottom: 16px; }
 h2 { margin-top: 0; }
 </style>
@@ -202,7 +203,7 @@ h2 { margin-top: 0; }
 <button onclick="simulate()">シミュレーションする</button>
 
 <h3>④ シミュレーション結果</h3>
-<pre id="result"></pre>
+<div id="result_area"></div>
 
 <script>
 async function simulate(){
@@ -233,8 +234,34 @@ async function simulate(){
   });
 
   const data = await res.json();
-  document.getElementById("result").textContent =
-    JSON.stringify(data, null, 2);
+
+  let html = "";
+
+  // 基本損益指標
+  html += "<h4>基本損益指標</h4>";
+  html += "<table><tr><th>項目</th><th>値</th></tr>";
+  html += `<tr><td>ネットプレミアム</td><td>${data.net_premium}</td></tr>`;
+  html += `<tr><td>最大利益</td><td>${data.max_profit}</td></tr>`;
+  html += `<tr><td>最大損失</td><td>${data.max_loss}</td></tr>`;
+  html += `<tr><td>ブレークイーブン</td><td>${data.breakeven}</td></tr>`;
+  html += `<tr><td>現在値での損益</td><td>${data.pnl_at_spot}</td></tr>`;
+  html += "</table>";
+
+  // Greeks
+  html += "<h4>Greeks</h4>";
+  html += "<table><tr><th>指標</th><th>値</th></tr>";
+  html += `<tr><td>IV</td><td>${data.greeks.iv}</td></tr>`;
+  html += `<tr><td>Delta</td><td>${data.greeks.delta}</td></tr>`;
+  html += `<tr><td>Gamma</td><td>${data.greeks.gamma}</td></tr>`;
+  html += `<tr><td>Theta</td><td>${data.greeks.theta}</td></tr>`;
+  html += `<tr><td>Vega</td><td>${data.greeks.vega}</td></tr>`;
+  html += "</table>";
+
+  // 調整案コメント
+  html += "<h4>調整案</h4>";
+  html += `<p>${data.adjustment_comment}</p>`;
+
+  document.getElementById("result_area").innerHTML = html;
 }
 </script>
 
