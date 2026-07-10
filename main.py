@@ -29,18 +29,13 @@ def to_int(s):
     except:
         return None
 
-# 売気配／買気配（価格＋数量）
-def parse_price_size(s):
-    m = re.search(r"([\d\.]+)\s*\((\d+)\)", s)
-    if m:
-        return to_float(m.group(1)), to_int(m.group(2))
-    try:
-        return to_float(s), None
-    except:
-        return None, None
+def qty(s):
+    # "(25)" → 25
+    m = re.search(r"\((\d+)\)", s)
+    return int(m.group(1)) if m else None
 
 # ---------------------------------------------------------
-# コール17行セットをパース
+# コール18行セットをパース
 # ---------------------------------------------------------
 def parse_call(block):
     return {
@@ -53,13 +48,21 @@ def parse_call(block):
         "open": to_float(block[7]),
         "high": to_float(block[8]),
         "low": to_float(block[9]),
-        "bid": parse_price_size(block[10])[0],
-        "bid_size": parse_price_size(block[10])[1],
-        "ask": parse_price_size(block[11])[0],
-        "ask_size": parse_price_size(block[11])[1],
-        "last": to_float(block[12]),
-        "change": to_float(block[13]),
-        "volume": to_int(block[14])
+
+        # 売気配（価格＋数量）
+        "bid": to_float(block[10]),
+        "bid_size": qty(block[11]),
+
+        # 買気配（価格＋数量）
+        "ask": to_float(block[12]),
+        "ask_size": qty(block[13]),
+
+        "last": to_float(block[14]),
+        "change": to_float(block[15]),
+        "volume": to_int(block[16]),
+
+        # ★ strike 正しく取得
+        "strike": to_int(block[17])
     }
 
 # ---------------------------------------------------------
@@ -70,23 +73,28 @@ def parse_put(block):
         "last": to_float(block[0]),
         "change": to_float(block[1]),
         "volume": to_int(block[2]),
-        "bid": parse_price_size(block[4])[0],
-        "bid_size": parse_price_size(block[4])[1],
-        "ask": parse_price_size(block[3])[0],
-        "ask_size": parse_price_size(block[3])[1],
-        "open": to_float(block[5]),
-        "high": to_float(block[6]),
-        "low": to_float(block[7]),
-        "theoretical": to_float(block[8]),
-        "delta": to_float(block[9]),
-        "gamma": to_float(block[10]),
-        "iv": to_float(block[11]),
-        "theta": to_float(block[12]),
-        "vega": to_float(block[13])
+
+        # 買気配（価格＋数量）
+        "ask": to_float(block[3]),
+        "ask_size": qty(block[4]),
+
+        # 売気配（価格＋数量）
+        "bid": to_float(block[5]),
+        "bid_size": qty(block[6]),
+
+        "open": to_float(block[7]),
+        "high": to_float(block[8]),
+        "low": to_float(block[9]),
+        "theoretical": to_float(block[10]),
+        "delta": to_float(block[11]),
+        "gamma": to_float(block[12]),
+        "iv": to_float(block[13]),
+        "theta": to_float(block[14]),
+        "vega": to_float(block[15])
     }
 
 # ---------------------------------------------------------
-# 全行から 34行セット（コール17＋プット17）を抽出
+# 全行から 35行セット（コール18＋プット17）を抽出
 # ---------------------------------------------------------
 def parse_lines(lines):
     results = []
@@ -94,26 +102,22 @@ def parse_lines(lines):
     n = len(lines)
 
     while i < n:
-        # コール側の開始は「新規」
         if lines[i].startswith("新規"):
-            # 34行揃っているか確認
-            if i + 33 < n:
-                call_block = lines[i:i+17]
-                put_block  = lines[i+17:i+34]
+            # コール18行＋プット17行＝35行必要
+            if i + 34 < n:
+                call_block = lines[i:i+18]
+                put_block  = lines[i+18:i+35]
 
                 call_json = parse_call(call_block)
                 put_json  = parse_put(put_block)
 
-                # ストライクはコール側の17行目
-                strike = to_int(call_block[16])
-
                 results.append({
-                    "strike": strike,
+                    "strike": call_json["strike"],
                     "call": call_json,
                     "put": put_json
                 })
 
-                i += 34
+                i += 35
             else:
                 break
         else:
