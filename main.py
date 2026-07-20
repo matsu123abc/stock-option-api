@@ -71,6 +71,7 @@ def simulate_call_spread(
         max_loss = spread_width - net_premium
         breakeven = k_short - net_premium
 
+        # プットは intrinsic = max(K - SQ, 0) をショート側ストライクで計算
         intrinsic_spot = max(k_short - spot, 0)
         intrinsic_spot = min(intrinsic_spot, spread_width)
         pnl_at_spot = net_premium - intrinsic_spot
@@ -145,17 +146,17 @@ def simulate_call_spread(
     pnl_curve = []
     for sq in sqs:
         if strategy_type in ("bull", "bear"):
-            # コール
+            # コール系 intrinsic = max(SQ - K, 0)
             if strategy_type == "bull":
                 intrinsic_sq = max(sq - k_long, 0)
                 intrinsic_sq = min(intrinsic_sq, spread_width)
                 pnl_sq = intrinsic_sq - net_premium
-            else:
+            else:  # bear (bear call)
                 intrinsic_sq = max(sq - k_short, 0)
                 intrinsic_sq = min(intrinsic_sq, spread_width)
                 pnl_sq = net_premium - intrinsic_sq
         else:
-            # プット
+            # プット系 intrinsic = max(K - SQ, 0)
             if strategy_type == "bull_put":
                 intrinsic_sq = max(k_short - sq, 0)
                 intrinsic_sq = min(intrinsic_sq, spread_width)
@@ -174,22 +175,27 @@ def simulate_call_spread(
         if close_short_now:
             buyback_cost = market_price_short + commission_per_leg_short + slippage_short
 
-            # クレジット戦略かデビット戦略か
+            # クレジット戦略かデビット戦略かで現金フローの符号を統一
             is_credit = strategy_type in ("bear", "bull_put")
 
             if is_credit:
+                # 受け取りがある戦略：最初に受け取った net_premium から買戻しコストを差し引く
                 cash_after = net_premium - buyback_cost
             else:
+                # 支払いがある戦略：最初に支払った net_premium をマイナスで扱い、買戻しコストを加える
                 cash_after = -net_premium - buyback_cost
 
-            long_strike = k_long  # ロング側ストライク
+            # 裸ロングは常に k_long 側（買いポジション）
+            long_strike = k_long
 
             shortout_curve = []
             for sq in sqs:
                 if strategy_type in ("bull", "bear"):
-                    payoff_long = max(sq - long_strike, 0)   # コール
+                    # コールの裸ロング payoff = max(SQ - k_long, 0)
+                    payoff_long = max(sq - long_strike, 0)
                 else:
-                    payoff_long = max(long_strike - sq, 0)   # プット
+                    # プットの裸ロング payoff = max(k_long - SQ, 0)
+                    payoff_long = max(long_strike - sq, 0)
 
                 pnl_sq = cash_after + payoff_long
                 shortout_curve.append({
@@ -215,10 +221,8 @@ def simulate_call_spread(
 
     # --- ロール計算ヘルパー ---
     def calc_roll(k_short_new, k_long_new, net_premium_new):
-        if strategy_type in ("bull", "bear"):
-            spread_w = abs(k_long_new - k_short_new)
-        else:
-            spread_w = abs(k_short_new - k_long_new)
+        # スプレッド幅は常に正の値（絶対値）
+        spread_w = abs(k_long_new - k_short_new)
 
         curve = []
         for sq in sqs:
@@ -241,6 +245,7 @@ def simulate_call_spread(
 
             curve.append({"sq": sq, "intrinsic": intrinsic_sq, "pnl": pnl_sq * size})
 
+        # spot の損益（ロール後）
         if strategy_type == "bull":
             intrinsic_spot_new = max(spot - k_long_new, 0)
             intrinsic_spot_new = min(intrinsic_spot_new, spread_w)
@@ -274,6 +279,7 @@ def simulate_call_spread(
         k_short_new = k_short + direction * roll_amount
         k_long_new  = k_long  + direction * roll_amount
 
+        # base_net を戦略別に統一（クレジットは short - long、デビットは long - short）
         if strategy_type == "bull":
             base_net = premium_long - premium_short
         elif strategy_type == "bear":
@@ -334,7 +340,7 @@ def api_simulate(payload: dict):
 
     adjustment = payload.get("adjustment", "none")
 
-    # ★ ブル／ベア
+    # ★ ブル／ベア／プット
     strategy_type = payload.get("strategy_type", "bear")
 
     # short out params
