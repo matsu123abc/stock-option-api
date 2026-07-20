@@ -264,58 +264,7 @@ def index():
 <meta charset="UTF-8">
 <title>コールスプレッド シミュレーション（詳細ロール対応）</title>
 <style>
-/* スマホ対応（画面幅 600px 以下） */
-@media (max-width: 600px) {
-
-  body {
-    padding: 10px;
-    font-size: 14px;
-  }
-
-  h2, h3, h4, h5 {
-    font-size: 1.1em;
-  }
-
-  input, select {
-    width: 100%;
-    padding: 10px;
-    font-size: 16px;   /* スマホで押しやすいサイズ */
-  }
-
-  button {
-    width: 100%;
-    padding: 14px;
-    font-size: 18px;
-    margin-top: 12px;
-  }
-
-  table {
-    font-size: 13px;
-  }
-
-  th, td {
-    padding: 8px;
-  }
-
-  /* セクション間の余白を少し広げる */
-  .section {
-    margin-bottom: 20px;
-  }
-
-  /* スマホで見やすいようにラベルを太字に */
-  label {
-    font-weight: 600;
-    margin-top: 8px;
-    display: block;
-  }
-
-  /* 結果表示エリアの余白調整 */
-  #result_area {
-    margin-top: 20px;
-    font-size: 14px;
-  }
-}
-
+/* PC用（デフォルト） */
 body { font-family: sans-serif; padding: 20px; font-size: 16px; }
 input, select { width: 100%; padding: 6px; margin: 4px 0; font-size: 16px; }
 button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; }
@@ -327,6 +276,64 @@ h2 { margin-top: 0; }
 .highlight { background:#fff3cd; font-weight:700; }
 .small { font-size: 0.9em; color:#555; text-align:left; }
 .hidden { display: none; }
+
+/* ▼ スマホ対応（画面幅 600px 以下） ▼ */
+@media (max-width: 600px) {
+
+  body {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  h2, h3, h4, h5 {
+    font-size: 1.1em;
+    margin-bottom: 8px;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;        /* 余白を広げてタップしやすく */
+    font-size: 16px;
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    margin-top: 14px;
+    background: #007bff;  /* 視認性アップ */
+    color: white;
+    border-radius: 6px;
+  }
+
+  table {
+    font-size: 13px;
+    display: block;        /* 横スクロール可能に */
+    overflow-x: auto;
+  }
+
+  th, td {
+    padding: 8px;
+  }
+
+  .section {
+    margin-bottom: 22px;   /* セクション間の余白を広げる */
+  }
+
+  label {
+    font-weight: 600;
+    margin-top: 10px;
+    display: block;
+  }
+
+  #result_area {
+    margin-top: 20px;
+    font-size: 14px;
+  }
+}
+/* ▲ スマホ対応 ▲ */
+
 </style>
 </head>
 <body>
