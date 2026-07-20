@@ -255,6 +255,9 @@ def api_simulate(payload: dict):
 
     return result
 
+# ============================================================
+# ) HTML（スマホ最適化 UI）
+# ============================================================
 @app.get("/", response_class=HTMLResponse)
 def index():
     return """
@@ -297,10 +300,12 @@ h2 { margin-top: 0; }
     margin-top: 18px;
   }
 
+  /* ★ ラベル文字を大きくする（最重要） */
   label {
     font-weight: 600;
     margin-top: 12px;
     display: block;
+    font-size: 20px;   /* ← ここを追加 */
   }
 
   input, select {
@@ -325,7 +330,7 @@ h2 { margin-top: 0; }
   table {
     font-size: 14px;
     display: block;
-    overflow-x: auto;   /* スマホで横スクロール可能 */
+    overflow-x: auto;
     margin-top: 16px;
   }
 
@@ -353,42 +358,45 @@ h2 { margin-top: 0; }
 
 <div class="section">
   <h3>① 市場データ（手入力）</h3>
+
   <label>現在の日経225株価（spot）</label>
-  <input id="spot" type="number" step="0.1" />
+  <input id="spot" type="number" step="0.1" placeholder="例：68557" />
 
   <label>IV</label>
-  <input id="iv" type="number" step="0.01" />
+  <input id="iv" type="number" step="0.01" placeholder="例：31.4" />
 
   <label>Delta</label>
-  <input id="delta" type="number" step="0.0001" />
+  <input id="delta" type="number" step="0.0001" placeholder="例：0.43" />
 
   <label>Gamma</label>
-  <input id="gamma" type="number" step="0.0001" />
+  <input id="gamma" type="number" step="0.0001" placeholder="例：0.0000" />
 
   <label>Theta</label>
-  <input id="theta" type="number" step="0.0001" />
+  <input id="theta" type="number" step="0.0001" placeholder="例：-37" />
 
   <label>Vega</label>
-  <input id="vega" type="number" step="0.0001" />
+  <input id="vega" type="number" step="0.0001" placeholder="例：83" />
 </div>
 
 <div class="section">
   <h3>② 戦略条件（手入力）</h3>
+
   <label>K_short（売りストライク）</label>
-  <input id="k_short" type="number" step="5" />
+  <input id="k_short" type="number" step="5" placeholder="例：69000" />
 
   <label>premium_short（受け取り）</label>
-  <input id="premium_short" type="number" step="0.1" />
+  <input id="premium_short" type="number" step="0.1" placeholder="例：2300" />
 
   <label>K_long（買いストライク）</label>
-  <input id="k_long" type="number" step="5" />
+  <input id="k_long" type="number" step="5" placeholder="例：70000" />
 
   <label>premium_long（支払い）</label>
-  <input id="premium_long" type="number" step="0.1" />
+  <input id="premium_long" type="number" step="0.1" placeholder="例：1830" />
 
   <label>size（枚数）</label>
-  <input id="size" type="number" step="1" value="1" />
+  <input id="size" type="number" step="1" value="1" placeholder="例：1" />
 </div>
+
 
 <div class="section">
   <h3>③ 調整ロジック案（選択）</h3>
