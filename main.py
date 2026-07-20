@@ -262,7 +262,12 @@ def index():
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+
+<!-- スマホ最適化の必須設定 -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
 <title>コールスプレッド シミュレーション（詳細ロール対応）</title>
+
 <style>
 /* PC用（デフォルト） */
 body { font-family: sans-serif; padding: 20px; font-size: 16px; }
@@ -283,58 +288,64 @@ h2 { margin-top: 0; }
   body {
     padding: 10px;
     font-size: 14px;
+    line-height: 1.4;
   }
 
   h2, h3, h4, h5 {
-    font-size: 1.1em;
-    margin-bottom: 8px;
-  }
-
-  input, select {
-    width: 100%;
-    padding: 10px;
-    margin: 8px 0;        /* 余白を広げてタップしやすく */
-    font-size: 16px;
-  }
-
-  button {
-    width: 100%;
-    padding: 14px;
-    font-size: 18px;
-    margin-top: 14px;
-    background: #007bff;  /* 視認性アップ */
-    color: white;
-    border-radius: 6px;
-  }
-
-  table {
-    font-size: 13px;
-    display: block;        /* 横スクロール可能に */
-    overflow-x: auto;
-  }
-
-  th, td {
-    padding: 8px;
-  }
-
-  .section {
-    margin-bottom: 22px;   /* セクション間の余白を広げる */
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    margin-top: 18px;
   }
 
   label {
     font-weight: 600;
-    margin-top: 10px;
+    margin-top: 12px;
     display: block;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+
+  button {
+    width: 100%;
+    padding: 16px;
+    font-size: 20px;
+    margin-top: 18px;
+    background: #007bff;
+    color: white;
+    border-radius: 8px;
+    border: none;
+  }
+
+  table {
+    font-size: 14px;
+    display: block;
+    overflow-x: auto;   /* スマホで横スクロール可能 */
+    margin-top: 16px;
+  }
+
+  th, td {
+    padding: 10px;
+  }
+
+  .section {
+    margin-bottom: 24px;
   }
 
   #result_area {
     margin-top: 20px;
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 /* ▲ スマホ対応 ▲ */
 
 </style>
+   
 </head>
 <body>
 
