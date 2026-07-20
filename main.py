@@ -38,7 +38,7 @@ def simulate_call_spread(
       - "bear_put"  : ベアプット（デビット）
     """
 
-    # --- 基本損益（コール／プット） ---
+    # --- 基本損益 ---
     if strategy_type == "bull":
         # ブルコール（デビット）
         net_premium = premium_long - premium_short
@@ -174,7 +174,7 @@ def simulate_call_spread(
         if close_short_now:
             buyback_cost = market_price_short + commission_per_leg_short + slippage_short
 
-            # クレジット戦略かデビット戦略かで現金の符号を統一
+            # クレジット戦略かデビット戦略か
             is_credit = strategy_type in ("bear", "bull_put")
 
             if is_credit:
@@ -182,8 +182,7 @@ def simulate_call_spread(
             else:
                 cash_after = -net_premium - buyback_cost
 
-            # 裸ロングのストライク（常に k_long 側がロング）
-            long_strike = k_long
+            long_strike = k_long  # ロング側ストライク
 
             shortout_curve = []
             for sq in sqs:
@@ -275,7 +274,6 @@ def simulate_call_spread(
         k_short_new = k_short + direction * roll_amount
         k_long_new  = k_long  + direction * roll_amount
 
-        # base_net を戦略別に統一
         if strategy_type == "bull":
             base_net = premium_long - premium_short
         elif strategy_type == "bear":
