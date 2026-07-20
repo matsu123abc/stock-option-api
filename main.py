@@ -1,35 +1,35 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from typing import Dict, Any
 import uvicorn
 
 app = FastAPI()
 
 def simulate_call_spread(
-    spot,
-    k_short,
-    premium_short,
-    k_long,
-    premium_long,
-    size,
-    iv,
-    delta,
-    gamma,
-    theta,
-    vega,
-    adjustment,
-    close_short_now=False,
-    market_price_short=0.0,
-    commission_per_leg_short=0.0,
-    slippage_short=0.0,
-    roll_amount=1000.0,
-    assumed_premium_change=0.0,
-    use_detailed_roll=False,
-    buyback_price_short=0.0,
-    buyback_commission_short=0.0,
-    buyback_slippage_short=0.0,
-    new_sell_premium=0.0,
-    strategy_type="bear",
-):
+    spot: float,
+    k_short: float,
+    premium_short: float,
+    k_long: float,
+    premium_long: float,
+    size: int,
+    iv: float,
+    delta: float,
+    gamma: float,
+    theta: float,
+    vega: float,
+    adjustment: str,
+    close_short_now: bool = False,
+    market_price_short: float = 0.0,
+    commission_per_leg_short: float = 0.0,
+    slippage_short: float = 0.0,
+    roll_amount: float = 1000.0,
+    assumed_premium_change: float = 0.0,
+    use_detailed_roll: bool = False,
+    buyback_price_short: float = 0.0,
+    buyback_commission_short: float = 0.0,
+    buyback_slippage_short: float = 0.0,
+    new_sell_premium: float = 0.0,
+    strategy_type: str = "bear",
+) -> Dict[str, Any]:
     """
     strategy_type:
       - "bull"      : ブルコール（デビット）
@@ -40,7 +40,7 @@ def simulate_call_spread(
 
     # --- 基本損益 ---
     if strategy_type == "bull":
-        # ブルコール（デビット）
+        # ブルコール（デビット）: buy lower strike (k_long), sell higher strike (k_short)
         net_premium = premium_long - premium_short
         spread_width = k_short - k_long
         max_profit = spread_width - net_premium
@@ -52,7 +52,7 @@ def simulate_call_spread(
         pnl_at_spot = intrinsic_spot - net_premium
 
     elif strategy_type == "bear":
-        # ベアコール（クレジット）
+        # ベアコール（クレジット）: sell lower strike (k_short), buy higher strike (k_long)
         net_premium = premium_short - premium_long
         spread_width = k_long - k_short
         max_profit = net_premium
@@ -64,7 +64,7 @@ def simulate_call_spread(
         pnl_at_spot = net_premium - intrinsic_spot
 
     elif strategy_type == "bull_put":
-        # ブルプット（クレジット）: short 高ストライク, long 低ストライク
+        # ブルプット（クレジット）: short 高ストライク (k_short), long 低ストライク (k_long)
         net_premium = premium_short - premium_long
         spread_width = k_short - k_long
         max_profit = net_premium
@@ -77,7 +77,7 @@ def simulate_call_spread(
         pnl_at_spot = net_premium - intrinsic_spot
 
     elif strategy_type == "bear_put":
-        # ベアプット（デビット）: long 高ストライク, short 低ストライク
+        # ベアプット（デビット）: long 高ストライク (k_long), short 低ストライク (k_short)
         net_premium = premium_long - premium_short
         spread_width = k_long - k_short
         max_profit = spread_width - net_premium
@@ -99,7 +99,7 @@ def simulate_call_spread(
         "vega": vega
     }
 
-    result = {
+    result: Dict[str, Any] = {
         "spot": spot,
         "k_short": k_short,
         "premium_short": premium_short,
@@ -220,7 +220,7 @@ def simulate_call_spread(
             }
 
     # --- ロール計算ヘルパー ---
-    def calc_roll(k_short_new, k_long_new, net_premium_new):
+    def calc_roll(k_short_new: float, k_long_new: float, net_premium_new: float) -> Dict[str, Any]:
         # スプレッド幅は常に正の値（絶対値）
         spread_w = abs(k_long_new - k_short_new)
 
@@ -277,7 +277,7 @@ def simulate_call_spread(
         direction = 1 if adjustment == "roll_up" else -1
 
         k_short_new = k_short + direction * roll_amount
-        k_long_new  = k_long  + direction * roll_amount
+        k_long_new = k_long + direction * roll_amount
 
         # base_net を戦略別に統一（クレジットは short - long、デビットは long - short）
         if strategy_type == "bull":
