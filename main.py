@@ -264,6 +264,58 @@ def index():
 <meta charset="UTF-8">
 <title>コールスプレッド シミュレーション（詳細ロール対応）</title>
 <style>
+/* スマホ対応（画面幅 600px 以下） */
+@media (max-width: 600px) {
+
+  body {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  h2, h3, h4, h5 {
+    font-size: 1.1em;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;   /* スマホで押しやすいサイズ */
+  }
+
+  button {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    margin-top: 12px;
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 8px;
+  }
+
+  /* セクション間の余白を少し広げる */
+  .section {
+    margin-bottom: 20px;
+  }
+
+  /* スマホで見やすいようにラベルを太字に */
+  label {
+    font-weight: 600;
+    margin-top: 8px;
+    display: block;
+  }
+
+  /* 結果表示エリアの余白調整 */
+  #result_area {
+    margin-top: 20px;
+    font-size: 14px;
+  }
+}
+
 body { font-family: sans-serif; padding: 20px; font-size: 16px; }
 input, select { width: 100%; padding: 6px; margin: 4px 0; font-size: 16px; }
 button { width: 100%; padding: 10px; margin-top: 10px; font-size: 16px; }
