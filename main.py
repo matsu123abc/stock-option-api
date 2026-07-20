@@ -397,7 +397,6 @@ h2 { margin-top: 0; }
   <input id="size" type="number" step="1" value="1" placeholder="例：1" />
 </div>
 
-
 <div class="section">
   <h3>③ 調整ロジック案（選択）</h3>
   <select id="adjustment" onchange="onAdjustmentChange()">
@@ -410,52 +409,58 @@ h2 { margin-top: 0; }
   <!-- ロール追加入力 -->
   <div id="roll_inputs" class="hidden">
     <h4>ロールの追加入力</h4>
-    <label>ロール幅 roll_amount（例 1000）</label>
-    <input id="roll_amount" type="number" step="1" value="1000" />
 
-    <label>簡易想定差 assumed_premium_change（net_premium に直接加算）</label>
-    <input id="assumed_premium_change" type="number" step="1" value="0" />
+    <label>ロール幅 roll_amount</label>
+    <input id="roll_amount" type="number" step="1" value="1000" placeholder="例：1000" />
 
-    <label><input id="use_detailed_roll" type="checkbox" /> 詳細ロールを使う（買戻しコストと新規売りプレミアムを個別入力）</label>
+    <label>簡易想定差 assumed_premium_change（net_premium に加算）</label>
+    <input id="assumed_premium_change" type="number" step="1" value="0" placeholder="例：200" />
+
+    <label><input id="use_detailed_roll" type="checkbox" /> 詳細ロールを使う（買戻し＋新規売りを個別入力）</label>
 
     <div id="detailed_roll_inputs" class="hidden">
       <h5>買戻し（ショート）想定</h5>
+
       <label>ショート買戻し想定価格 buyback_price_short</label>
-      <input id="buyback_price_short" type="number" step="0.1" />
+      <input id="buyback_price_short" type="number" step="0.1" placeholder="例：2300" />
 
       <label>買戻し手数料 buyback_commission_short（片側）</label>
-      <input id="buyback_commission_short" type="number" step="0.1" value="0" />
+      <input id="buyback_commission_short" type="number" step="0.1" value="0" placeholder="例：0" />
 
       <label>買戻しスリッページ buyback_slippage_short</label>
-      <input id="buyback_slippage_short" type="number" step="0.1" value="0" />
+      <input id="buyback_slippage_short" type="number" step="0.1" value="0" placeholder="例：0" />
 
       <h5>新規売り（上のストライク）想定</h5>
-      <label>新規売りプレミアム new_sell_premium（上のストライクで受け取る想定）</label>
-      <input id="new_sell_premium" type="number" step="0.1" value="0" />
 
-      <p class="small">注：詳細ロールでは買戻しコストと新規売りプレミアムを個別に入力し、現金フローを正確に計算します。</p>
+      <label>新規売りプレミアム new_sell_premium</label>
+      <input id="new_sell_premium" type="number" step="0.1" value="0" placeholder="例：1800" />
+
+      <p class="small">注：詳細ロールでは買戻しコストと新規売りプレミアムを個別に入力します。</p>
     </div>
   </div>
 
   <!-- ショート外し用追加入力欄 -->
   <div id="shortout_inputs" class="hidden">
     <h4>ショート外しの追加入力</h4>
-    <label><input id="close_short_now" type="checkbox" /> ショートを今すぐ買い戻す（チェックすると下の入力を使用）</label>
+
+    <label><input id="close_short_now" type="checkbox" /> ショートを今すぐ買い戻す</label>
 
     <div id="shortout_now_inputs" class="hidden">
+
       <label>ショート買戻し想定価格 market_price_short</label>
-      <input id="market_price_short" type="number" step="0.1" />
+      <input id="market_price_short" type="number" step="0.1" placeholder="例：2400" />
 
-      <label>手数料 commission_per_leg_short（買戻しにかかる片側手数料）</label>
-      <input id="commission_per_leg_short" type="number" step="0.1" value="0" />
+      <label>手数料 commission_per_leg_short（片側）</label>
+      <input id="commission_per_leg_short" type="number" step="0.1" value="0" placeholder="例：0" />
 
-      <label>スリッページ slippage_short（買戻し時の不利な価格変動）</label>
-      <input id="slippage_short" type="number" step="0.1" value="0" />
+      <label>スリッページ slippage_short</label>
+      <input id="slippage_short" type="number" step="0.1" value="0" placeholder="例：0" />
     </div>
 
-    <p class="small">注：ショートを買い戻すと裸ロング（ロングのみ保有）になります。買戻しコストが大きいと即時損失が発生します。</p>
+    <p class="small">注：ショートを買い戻すと裸ロングになります。</p>
   </div>
 </div>
+
 
 <button onclick="simulate()">シミュレーションする</button>
 
