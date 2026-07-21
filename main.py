@@ -593,7 +593,7 @@ def index():
 <!-- スマホ最適化の必須設定 -->
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 
-<title>コールスプレッド シミュレーション（詳細ロール対応）</title>
+<title>コール／プット スプレッド シミュレーション</title>
 
 <style>
 /* PC用（デフォルト） */
