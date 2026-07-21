@@ -242,6 +242,238 @@ def simulate_call_spread(
     return result
 
 
+def simulate_put_spread(
+    spot,
+    k_short,
+    premium_short,
+    k_long,
+    premium_long,
+    size,
+    iv,
+    delta,
+    gamma,
+    theta,
+    vega,
+    adjustment,
+    close_short_now=False,
+    market_price_short=0.0,
+    commission_per_leg_short=0.0,
+    slippage_short=0.0,
+    roll_amount=1000.0,
+    assumed_premium_change=0.0,
+    use_detailed_roll=False,
+    buyback_price_short=0.0,
+    buyback_commission_short=0.0,
+    buyback_slippage_short=0.0,
+    new_sell_premium=0.0,
+    strategy_type="bull_put",   # bull_put / bear_put
+):
+    """
+    プットスプレッド損益計算（ブルプット／ベアプット両対応）
+
+    strategy_type:
+      - "bull_put": ブルプット（クレジット）
+      - "bear_put": ベアプット（デビット）
+    """
+
+    # --- 基本損益 ---
+    if strategy_type == "bull_put":
+        # ブルプット（クレジット）: short 高ストライク, long 低ストライク
+        net_premium = premium_short - premium_long
+        spread_width = k_short - k_long
+        max_profit = net_premium
+        max_loss = spread_width - net_premium
+        breakeven = k_short - net_premium
+
+        intrinsic_spot = max(k_short - spot, 0)
+        intrinsic_spot = min(intrinsic_spot, spread_width)
+        pnl_at_spot = net_premium - intrinsic_spot
+
+    else:
+        # ベアプット（デビット）: long 高ストライク, short 低ストライク
+        net_premium = premium_long - premium_short
+        spread_width = k_long - k_short
+        max_profit = spread_width - net_premium
+        max_loss = net_premium
+        breakeven = k_long - net_premium
+
+        intrinsic_spot = max(k_long - spot, 0)
+        intrinsic_spot = min(intrinsic_spot, spread_width)
+        pnl_at_spot = intrinsic_spot - net_premium
+
+    greeks = {
+        "iv": iv,
+        "delta": delta,
+        "gamma": gamma,
+        "theta": theta,
+        "vega": vega
+    }
+
+    result = {
+        "spot": spot,
+        "k_short": k_short,
+        "premium_short": premium_short,
+        "k_long": k_long,
+        "premium_long": premium_long,
+        "size": size,
+        "strategy_type": strategy_type,
+        "net_premium": net_premium,
+        "max_profit": max_profit * size,
+        "max_loss": max_loss * size,
+        "breakeven": breakeven,
+        "pnl_at_spot": pnl_at_spot * size,
+        "adjustment": adjustment,
+        "adjustment_comment": "",
+        "greeks": greeks,
+        "pnl_curve": [],
+        "shortout": None,
+        "roll_up": None,
+        "roll_down": None
+    }
+
+    # 調整コメント
+    if adjustment == "none":
+        result["adjustment_comment"] = "調整なし（現状維持）"
+    elif adjustment == "roll_up":
+        result["adjustment_comment"] = "ロールアップ案"
+    elif adjustment == "roll_down":
+        result["adjustment_comment"] = "ロールダウン案"
+    elif adjustment == "short_out":
+        result["adjustment_comment"] = "ショート外し案（ショートを買い戻す）"
+    else:
+        result["adjustment_comment"] = "不明な調整案"
+
+    # --- 満期損益表 ---
+    start = max(0, int(min(k_short, k_long)) - 2000)
+    end = int(max(k_short, k_long)) + 2000
+    step = 500
+    sqs = list(range(start, end + 1, step))
+    for v in [int(round(spot)), int(k_short), int(breakeven), int(k_long)]:
+        if v not in sqs:
+            sqs.append(v)
+    sqs = sorted(set(sqs))
+
+    pnl_curve = []
+    for sq in sqs:
+        if strategy_type == "bull_put":
+            intrinsic_sq = max(k_short - sq, 0)
+            intrinsic_sq = min(intrinsic_sq, spread_width)
+            pnl_sq = net_premium - intrinsic_sq
+        else:
+            intrinsic_sq = max(k_long - sq, 0)
+            intrinsic_sq = min(intrinsic_sq, spread_width)
+            pnl_sq = intrinsic_sq - net_premium
+
+        pnl_curve.append({"sq": sq, "intrinsic": intrinsic_sq, "pnl": pnl_sq * size})
+
+    result["pnl_curve"] = pnl_curve
+
+    # --- ショート外し（プット専用） ---
+    if adjustment == "short_out":
+        if close_short_now:
+            buyback_cost = market_price_short + commission_per_leg_short + slippage_short
+
+            is_credit = strategy_type == "bull_put"
+            if is_credit:
+                cash_after = net_premium - buyback_cost
+            else:
+                cash_after = -net_premium - buyback_cost
+
+            long_strike = k_long
+
+            shortout_curve = []
+            for sq in sqs:
+                payoff_long = max(long_strike - sq, 0)
+                pnl_sq = cash_after + payoff_long
+                shortout_curve.append({"sq": sq, "payoff_long": payoff_long, "pnl": pnl_sq * size})
+
+            result["shortout"] = {
+                "close_short_now": True,
+                "market_price_short": market_price_short,
+                "commission_per_leg_short": commission_per_leg_short,
+                "slippage_short": slippage_short,
+                "buyback_cost": buyback_cost,
+                "cash_after": cash_after * size,
+                "shortout_curve": shortout_curve
+            }
+        else:
+            result["shortout"] = {"close_short_now": False, "comment": "ショートを今買い戻さない設定です。"}
+
+    # --- ロール計算ヘルパー ---
+    def calc_roll(k_short_new, k_long_new, net_premium_new):
+        spread_w = abs(k_long_new - k_short_new)
+
+        curve = []
+        for sq in sqs:
+            if strategy_type == "bull_put":
+                intrinsic_sq = max(k_short_new - sq, 0)
+                intrinsic_sq = min(intrinsic_sq, spread_w)
+                pnl_sq = net_premium_new - intrinsic_sq
+            else:
+                intrinsic_sq = max(k_long_new - sq, 0)
+                intrinsic_sq = min(intrinsic_sq, spread_w)
+                pnl_sq = intrinsic_sq - net_premium_new
+
+            curve.append({"sq": sq, "intrinsic": intrinsic_sq, "pnl": pnl_sq * size})
+
+        if strategy_type == "bull_put":
+            intrinsic_spot_new = max(k_short_new - spot, 0)
+            intrinsic_spot_new = min(intrinsic_spot_new, spread_w)
+            pnl_at_spot_new = (net_premium_new - intrinsic_spot_new) * size
+        else:
+            intrinsic_spot_new = max(k_long_new - spot, 0)
+            intrinsic_spot_new = min(intrinsic_spot_new, spread_w)
+            pnl_at_spot_new = (intrinsic_spot_new - net_premium_new) * size
+
+        return {
+            "k_short": k_short_new,
+            "k_long": k_long_new,
+            "net_premium": net_premium_new,
+            "spread_width": spread_w,
+            "pnl_at_spot": pnl_at_spot_new,
+            "pnl_curve": curve
+        }
+
+    # --- ロールアップ／ロールダウン ---
+    if adjustment in ("roll_up", "roll_down"):
+        direction = 1 if adjustment == "roll_up" else -1
+
+        k_short_new = k_short + direction * roll_amount
+        k_long_new = k_long + direction * roll_amount
+
+        if strategy_type == "bull_put":
+            base_net = premium_short - premium_long
+        else:
+            base_net = premium_long - premium_short
+
+        if use_detailed_roll:
+            buyback_cost = buyback_price_short + buyback_commission_short + buyback_slippage_short
+            net_premium_new = base_net - buyback_cost + new_sell_premium
+            roll_detail = {
+                "use_detailed_roll": True,
+                "buyback_cost": buyback_cost,
+                "new_sell_premium": new_sell_premium,
+                "net_premium_new": net_premium_new
+            }
+        else:
+            net_premium_new = base_net + assumed_premium_change
+            roll_detail = {
+                "use_detailed_roll": False,
+                "assumed_premium_change": assumed_premium_change,
+                "net_premium_new": net_premium_new
+            }
+
+        roll_result = calc_roll(k_short_new, k_long_new, net_premium_new)
+        roll_result.update(roll_detail)
+
+        if adjustment == "roll_up":
+            result["roll_up"] = roll_result
+        else:
+            result["roll_down"] = roll_result
+
+    return result
+
+
 @app.post("/api/simulate")
 def api_simulate(payload: dict):
     spot = float(payload.get("spot", 0))
@@ -262,7 +494,7 @@ def api_simulate(payload: dict):
 
     adjustment = payload.get("adjustment", "none")
 
-    # ★ ブル／ベア
+    # ★ ブル／ベア／プット
     strategy_type = payload.get("strategy_type", "bear")
 
     # short out params
@@ -280,32 +512,69 @@ def api_simulate(payload: dict):
     buyback_slippage_short = float(payload.get("buyback_slippage_short", 0.0))
     new_sell_premium = float(payload.get("new_sell_premium", 0.0))
 
-    result = simulate_call_spread(
-        spot,
-        k_short,
-        premium_short,
-        k_long,
-        premium_long,
-        size,
-        iv,
-        delta,
-        gamma,
-        theta,
-        vega,
-        adjustment,
-        close_short_now=close_short_now,
-        market_price_short=market_price_short,
-        commission_per_leg_short=commission_per_leg_short,
-        slippage_short=slippage_short,
-        roll_amount=roll_amount,
-        assumed_premium_change=assumed_premium_change,
-        use_detailed_roll=use_detailed_roll,
-        buyback_price_short=buyback_price_short,
-        buyback_commission_short=buyback_commission_short,
-        buyback_slippage_short=buyback_slippage_short,
-        new_sell_premium=new_sell_premium,
-        strategy_type=strategy_type,
-    )
+    # ============================================================
+    # ★ ここが追加部分：コール／プットの分岐
+    # ============================================================
+    if strategy_type in ("bull", "bear"):
+        # コールスプレッド（既存コード）
+        result = simulate_call_spread(
+            spot,
+            k_short,
+            premium_short,
+            k_long,
+            premium_long,
+            size,
+            iv,
+            delta,
+            gamma,
+            theta,
+            vega,
+            adjustment,
+            close_short_now=close_short_now,
+            market_price_short=market_price_short,
+            commission_per_leg_short=commission_per_leg_short,
+            slippage_short=slippage_short,
+            roll_amount=roll_amount,
+            assumed_premium_change=assumed_premium_change,
+            use_detailed_roll=use_detailed_roll,
+            buyback_price_short=buyback_price_short,
+            buyback_commission_short=buyback_commission_short,
+            buyback_slippage_short=buyback_slippage_short,
+            new_sell_premium=new_sell_premium,
+            strategy_type=strategy_type,
+        )
+
+    elif strategy_type in ("bull_put", "bear_put"):
+        # プットスプレッド（新規追加）
+        result = simulate_put_spread(
+            spot,
+            k_short,
+            premium_short,
+            k_long,
+            premium_long,
+            size,
+            iv,
+            delta,
+            gamma,
+            theta,
+            vega,
+            adjustment,
+            close_short_now=close_short_now,
+            market_price_short=market_price_short,
+            commission_per_leg_short=commission_per_leg_short,
+            slippage_short=slippage_short,
+            roll_amount=roll_amount,
+            assumed_premium_change=assumed_premium_change,
+            use_detailed_roll=use_detailed_roll,
+            buyback_price_short=buyback_price_short,
+            buyback_commission_short=buyback_commission_short,
+            buyback_slippage_short=buyback_slippage_short,
+            new_sell_premium=new_sell_premium,
+            strategy_type=strategy_type,
+        )
+
+    else:
+        return {"error": f"invalid strategy_type: {strategy_type}"}
 
     return result
 
@@ -441,6 +710,8 @@ h2 { margin-top: 0; }
   <select id="strategy_type" onchange="updateStrategyExamples()">
     <option value="bull">ブルコールスプレッド（上昇系）</option>
     <option value="bear">ベアコールスプレッド（下落系）</option>
+    <option value="bull_put">ブルプットスプレッド（上昇系・プット）</option>
+    <option value="bear_put">ベアプットスプレッド（下落系・プット）</option>
   </select>
 
   <!-- 説明文 -->
@@ -474,9 +745,23 @@ function updateStrategyExamples(){
     document.getElementById("k_short").placeholder = "例：70000（売り）";
     document.getElementById("k_long").placeholder  = "例：69000（買い）";
 
-  } else {
+  } else if(type === "bear"){
     document.getElementById("strategy_desc").innerText =
       "ベアコール：低いストライクを売り、高いストライクを買う（クレジット）";
+
+    document.getElementById("k_short").placeholder = "例：69000（売り）";
+    document.getElementById("k_long").placeholder  = "例：70000（買い）";
+
+  } else if(type === "bull_put"){
+    document.getElementById("strategy_desc").innerText =
+      "ブルプット：高いストライクを売り、低いストライクを買う（クレジット）";
+
+    document.getElementById("k_short").placeholder = "例：70000（売り）";
+    document.getElementById("k_long").placeholder  = "例：69000（買い）";
+
+  } else if(type === "bear_put"){
+    document.getElementById("strategy_desc").innerText =
+      "ベアプット：低いストライクを売り、高いストライクを買う（デビット）";
 
     document.getElementById("k_short").placeholder = "例：69000（売り）";
     document.getElementById("k_long").placeholder  = "例：70000（買い）";
